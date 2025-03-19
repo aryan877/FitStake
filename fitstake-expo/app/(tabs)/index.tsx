@@ -2,6 +2,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { TrendingUp, Trophy, Users } from 'lucide-react-native';
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import theme from '../theme';
+
+const { colors, spacing, borderRadius, fontSize, fontWeight, shadows } = theme;
 
 export default function ChallengesScreen() {
   return (
@@ -14,24 +17,24 @@ export default function ChallengesScreen() {
 
         <View style={styles.featuredChallenge}>
           <LinearGradient
-            colors={['#4F46E5', '#7C3AED']}
+            colors={[colors.accent.primary, '#FF7043']}
             style={styles.gradientBg}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
             <View style={styles.challengeContent}>
-              <Trophy color="#fff" size={32} />
+              <Trophy color={colors.white} size={32} />
               <Text style={styles.challengeTitle}>10K Steps Challenge</Text>
               <Text style={styles.challengeSubtitle}>
                 Walk 10,000 steps daily for 30 days
               </Text>
               <View style={styles.statsRow}>
                 <View style={styles.stat}>
-                  <Users size={16} color="#fff" />
+                  <Users size={16} color={colors.white} />
                   <Text style={styles.statText}>24 participants</Text>
                 </View>
                 <View style={styles.stat}>
-                  <TrendingUp size={16} color="#fff" />
+                  <TrendingUp size={16} color={colors.white} />
                   <Text style={styles.statText}>300 SOL pool</Text>
                 </View>
               </View>
@@ -54,81 +57,83 @@ export default function ChallengesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#111827',
+    backgroundColor: colors.black,
   },
   scrollView: {
     flex: 1,
   },
   header: {
-    padding: 20,
-    paddingTop: 60,
+    padding: spacing.md,
+    paddingTop: spacing.xxl + spacing.xl,
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 8,
+    fontSize: fontSize.xxxl,
+    fontWeight: fontWeight.bold,
+    color: colors.white,
+    marginBottom: spacing.sm,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#9CA3AF',
+    fontSize: fontSize.md,
+    color: colors.gray[400],
   },
   featuredChallenge: {
-    margin: 20,
-    borderRadius: 16,
+    margin: spacing.md,
+    borderRadius: borderRadius.xl,
     overflow: 'hidden',
+    ...shadows.md,
   },
   gradientBg: {
-    padding: 24,
+    padding: spacing.lg,
   },
   challengeContent: {
-    gap: 12,
+    gap: spacing.sm,
   },
   challengeTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginTop: 12,
+    fontSize: fontSize.xxl,
+    fontWeight: fontWeight.bold,
+    color: colors.white,
+    marginTop: spacing.sm,
   },
   challengeSubtitle: {
-    fontSize: 16,
-    color: '#E5E7EB',
-    marginBottom: 8,
+    fontSize: fontSize.md,
+    color: colors.gray[100],
+    marginBottom: spacing.sm,
   },
   statsRow: {
     flexDirection: 'row',
-    gap: 16,
-    marginTop: 8,
+    gap: spacing.md,
+    marginTop: spacing.sm,
   },
   stat: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: spacing.xs + 2,
   },
   statText: {
-    color: '#fff',
-    fontSize: 14,
+    color: colors.white,
+    fontSize: fontSize.sm,
   },
   joinButton: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: colors.white,
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
     alignItems: 'center',
-    marginTop: 16,
+    marginTop: spacing.md,
+    ...shadows.sm,
   },
   joinButtonText: {
-    color: '#4F46E5',
-    fontSize: 16,
-    fontWeight: 'bold',
+    color: colors.accent.primary,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.bold,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginHorizontal: 20,
-    marginTop: 20,
+    fontSize: fontSize.xl,
+    fontWeight: fontWeight.bold,
+    color: colors.white,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.md,
   },
   challengesList: {
-    padding: 20,
+    padding: spacing.md,
   },
 });

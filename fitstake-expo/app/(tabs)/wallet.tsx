@@ -1,8 +1,70 @@
+import { useEmbeddedSolanaWallet } from '@privy-io/expo';
 import { ArrowDownLeft, ArrowUpRight, Wallet } from 'lucide-react-native';
-import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import theme from '../theme';
+
+const { colors, spacing, borderRadius, fontSize, fontWeight, shadows } = theme;
 
 export default function WalletScreen() {
+  const { wallets } = useEmbeddedSolanaWallet();
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const initializeWallet = async () => {
+      await checkWallet();
+      setIsLoading(false);
+    };
+
+    initializeWallet();
+  }, [wallets]);
+
+  const checkWallet = async () => {
+    try {
+      if (!wallets || wallets.length === 0) {
+        console.log('No wallets available');
+        setWalletAddress(null);
+        return;
+      }
+
+      const solanaWallet = wallets[0];
+
+      if (!solanaWallet) {
+        console.log('Solana wallet not available');
+        setWalletAddress(null);
+        return;
+      }
+
+      if (solanaWallet.address) {
+        console.log('Wallet found with address:', solanaWallet.address);
+        setWalletAddress(solanaWallet.address);
+      } else {
+        console.log('No address available');
+        setWalletAddress(null);
+      }
+    } catch (error) {
+      console.error('Error checking wallet:', error);
+      setWalletAddress(null);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color={colors.accent.primary} />
+        <Text style={styles.message}>Loading wallet information...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scrollView}>
@@ -11,8 +73,15 @@ export default function WalletScreen() {
           <Text style={styles.subtitle}>Manage your funds</Text>
         </View>
 
+        <View style={styles.walletAddressCard}>
+          <Text style={styles.walletAddressLabel}>Your Wallet Address</Text>
+          <Text style={styles.walletAddressValue}>
+            {walletAddress ? walletAddress : 'No wallet connected'}
+          </Text>
+        </View>
+
         <View style={styles.balanceCard}>
-          <Wallet color="#fff" size={32} />
+          <Wallet color={colors.white} size={32} />
           <Text style={styles.balanceLabel}>Available Balance</Text>
           <Text style={styles.balanceAmount}>12.5 SOL</Text>
           <View style={styles.buttonRow}>
@@ -29,7 +98,7 @@ export default function WalletScreen() {
         <View style={styles.transactionsList}>
           <View style={styles.transactionItem}>
             <View style={styles.transactionIcon}>
-              <ArrowUpRight color="#EF4444" size={20} />
+              <ArrowUpRight color={colors.accent.error} size={20} />
             </View>
             <View style={styles.transactionInfo}>
               <Text style={styles.transactionTitle}>Challenge Stake</Text>
@@ -42,7 +111,7 @@ export default function WalletScreen() {
 
           <View style={styles.transactionItem}>
             <View style={styles.transactionIcon}>
-              <ArrowDownLeft color="#10B981" size={20} />
+              <ArrowDownLeft color={colors.accent.secondary} size={20} />
             </View>
             <View style={styles.transactionInfo}>
               <Text style={styles.transactionTitle}>Challenge Reward</Text>
@@ -61,109 +130,139 @@ export default function WalletScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#111827',
+    backgroundColor: colors.black,
+  },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   scrollView: {
     flex: 1,
   },
   header: {
-    padding: 20,
-    paddingTop: 60,
+    padding: spacing.md,
+    paddingTop: spacing.xxl + spacing.xl,
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 8,
+    fontSize: fontSize.xxxl,
+    fontWeight: fontWeight.bold,
+    color: colors.white,
+    marginBottom: spacing.sm,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#9CA3AF',
+    fontSize: fontSize.md,
+    color: colors.gray[400],
+  },
+  walletAddressCard: {
+    margin: spacing.md,
+    marginBottom: spacing.sm,
+    padding: spacing.md,
+    backgroundColor: colors.gray[900],
+    borderRadius: borderRadius.xl,
+    ...shadows.sm,
+  },
+  walletAddressLabel: {
+    color: colors.gray[400],
+    fontSize: fontSize.md,
+    marginBottom: spacing.sm,
+  },
+  walletAddressValue: {
+    color: colors.white,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.medium,
   },
   balanceCard: {
-    margin: 20,
-    padding: 24,
-    backgroundColor: '#1F2937',
-    borderRadius: 16,
+    margin: spacing.md,
+    padding: spacing.lg,
+    backgroundColor: colors.gray[900],
+    borderRadius: borderRadius.xl,
     alignItems: 'center',
+    ...shadows.md,
   },
   balanceLabel: {
-    color: '#9CA3AF',
-    fontSize: 16,
-    marginTop: 12,
+    color: colors.gray[400],
+    fontSize: fontSize.md,
+    marginTop: spacing.sm,
   },
   balanceAmount: {
-    color: '#fff',
+    color: colors.white,
     fontSize: 40,
-    fontWeight: 'bold',
-    marginTop: 8,
+    fontWeight: fontWeight.bold,
+    marginTop: spacing.sm,
   },
   buttonRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginTop: 24,
+    gap: spacing.sm,
+    marginTop: spacing.lg,
   },
   actionButton: {
-    backgroundColor: '#4F46E5',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 12,
+    backgroundColor: colors.accent.primary,
+    paddingVertical: spacing.sm + 4,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.lg,
     minWidth: 120,
     alignItems: 'center',
+    ...shadows.sm,
   },
   buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    color: colors.white,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.bold,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginHorizontal: 20,
-    marginTop: 20,
+    fontSize: fontSize.xl,
+    fontWeight: fontWeight.bold,
+    color: colors.white,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.md,
   },
   transactionsList: {
-    padding: 20,
+    padding: spacing.md,
   },
   transactionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1F2937',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
+    backgroundColor: colors.gray[900],
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
+    marginBottom: spacing.sm,
+    ...shadows.sm,
   },
   transactionIcon: {
     width: 40,
     height: 40,
-    backgroundColor: '#374151',
+    backgroundColor: colors.gray[800],
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
   transactionInfo: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: spacing.sm,
   },
   transactionTitle: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '500',
+    color: colors.white,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.medium,
   },
   transactionDate: {
-    color: '#9CA3AF',
-    fontSize: 14,
-    marginTop: 4,
+    color: colors.gray[400],
+    fontSize: fontSize.sm,
+    marginTop: spacing.xs,
   },
   transactionAmount: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.bold,
   },
   positive: {
-    color: '#10B981',
+    color: colors.accent.secondary,
   },
   negative: {
-    color: '#EF4444',
+    color: colors.accent.error,
+  },
+  message: {
+    fontSize: fontSize.md,
+    color: colors.gray[400],
+    marginTop: spacing.md,
   },
 });

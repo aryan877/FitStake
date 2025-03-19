@@ -2,11 +2,14 @@ import { AuthBoundary } from '@privy-io/expo';
 import { Redirect, Stack } from 'expo-router';
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import theme from '../theme';
+
+const { colors, spacing, fontSize, fontWeight } = theme;
 
 function LoadingScreen() {
   return (
     <View style={styles.container}>
-      <ActivityIndicator size="large" color="#6366f1" />
+      <ActivityIndicator size="large" color={colors.accent.primary} />
       <Text style={styles.text}>Loading your profile...</Text>
     </View>
   );
@@ -40,19 +43,19 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#121212',
-    padding: 20,
+    backgroundColor: colors.black,
+    padding: spacing.md,
   },
   text: {
-    fontSize: 16,
-    color: '#aaa',
-    marginTop: 12,
+    fontSize: fontSize.md,
+    color: colors.gray[400],
+    marginTop: spacing.sm,
     textAlign: 'center',
   },
   errorText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#ef4444',
-    marginBottom: 8,
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.bold,
+    color: colors.accent.error,
+    marginBottom: spacing.sm,
   },
 });

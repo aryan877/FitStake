@@ -10,6 +10,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import theme from './theme';
+
+const { colors, spacing, borderRadius, fontSize, fontWeight } = theme;
 
 export default function SignInScreen() {
   const router = useRouter();
@@ -70,7 +73,7 @@ export default function SignInScreen() {
   if (isReady === false) {
     return (
       <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color="#6366f1" />
+        <ActivityIndicator size="large" color={colors.accent.primary} />
       </View>
     );
   }
@@ -97,7 +100,7 @@ export default function SignInScreen() {
             value={email}
             onChangeText={setEmail}
             placeholder="Enter your email"
-            placeholderTextColor="#666"
+            placeholderTextColor={colors.gray[600]}
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
@@ -127,7 +130,7 @@ export default function SignInScreen() {
               value={code}
               onChangeText={setCode}
               placeholder="Enter verification code"
-              placeholderTextColor="#666"
+              placeholderTextColor={colors.gray[600]}
               keyboardType="number-pad"
               maxLength={6}
             />
@@ -170,8 +173,8 @@ export default function SignInScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#121212',
-    padding: 20,
+    backgroundColor: colors.black,
+    padding: spacing.md,
     justifyContent: 'center',
   },
   centered: {
@@ -179,66 +182,66 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 8,
+    fontSize: fontSize.xxxl,
+    fontWeight: fontWeight.bold,
+    color: colors.white,
+    marginBottom: spacing.sm,
   },
   subtitle: {
-    fontSize: 18,
-    color: '#aaa',
-    marginBottom: 40,
+    fontSize: fontSize.lg,
+    color: colors.gray[400],
+    marginBottom: spacing.xxl,
   },
   card: {
-    backgroundColor: '#1e1e1e',
-    borderRadius: 12,
-    padding: 20,
+    backgroundColor: colors.gray[900],
+    borderRadius: borderRadius.xl,
+    padding: spacing.md,
     alignItems: 'center',
   },
   cardText: {
-    fontSize: 16,
-    color: '#ddd',
-    marginBottom: 24,
+    fontSize: fontSize.md,
+    color: colors.gray[200],
+    marginBottom: spacing.lg,
     textAlign: 'center',
     lineHeight: 24,
   },
   inputContainer: {
     width: '100%',
-    marginBottom: 16,
+    marginBottom: spacing.md,
   },
   input: {
-    backgroundColor: '#2a2a2a',
-    borderRadius: 8,
-    padding: 12,
-    color: '#fff',
-    fontSize: 16,
-    marginBottom: 12,
+    backgroundColor: colors.gray[800],
+    borderRadius: borderRadius.md,
+    padding: spacing.sm + 4,
+    color: colors.white,
+    fontSize: fontSize.md,
+    marginBottom: spacing.sm,
     width: '100%',
   },
   button: {
-    backgroundColor: '#6366f1',
-    borderRadius: 8,
-    padding: 14,
+    backgroundColor: colors.accent.primary,
+    borderRadius: borderRadius.md,
+    padding: spacing.sm + 6,
     alignItems: 'center',
     width: '100%',
   },
   buttonDisabled: {
-    backgroundColor: '#3f3f5f',
+    backgroundColor: colors.gray[700],
     opacity: 0.7,
   },
   buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    color: colors.white,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.semibold,
   },
   statusText: {
-    color: '#aaa',
-    marginTop: 16,
+    color: colors.gray[400],
+    marginTop: spacing.md,
     textAlign: 'center',
   },
   errorText: {
-    color: '#ef4444',
-    marginBottom: 16,
+    color: colors.accent.error,
+    marginBottom: spacing.md,
     textAlign: 'center',
   },
 });

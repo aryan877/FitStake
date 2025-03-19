@@ -2,6 +2,9 @@ import { Tabs } from 'expo-router';
 import { Activity, Trophy, User, Wallet } from 'lucide-react-native';
 import React from 'react';
 import { StyleSheet } from 'react-native';
+import theme from '../theme';
+
+const { colors } = theme;
 
 interface TabBarIconProps {
   color: string;
@@ -15,8 +18,8 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: styles.tabBar,
-        tabBarActiveTintColor: '#4F46E5',
-        tabBarInactiveTintColor: '#6B7280',
+        tabBarActiveTintColor: colors.accent.primary,
+        tabBarInactiveTintColor: colors.gray[400],
       }}
     >
       <Tabs.Screen
@@ -61,8 +64,8 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: '#1F2937',
-    borderTopColor: '#374151',
+    backgroundColor: colors.black,
+    borderTopColor: colors.gray[800],
     paddingBottom: 4,
     paddingTop: 4,
     height: 60,

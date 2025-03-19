@@ -7,6 +7,9 @@ import * as React from 'react';
 import { Alert, Platform, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFrameworkReady } from '../hooks/useFrameworkReady';
+import theme from './theme';
+
+const { colors, fontSize, fontWeight, spacing } = theme;
 
 // Get environment variables for Privy
 const PRIVY_APP_ID = process.env.EXPO_PUBLIC_PRIVY_APP_ID as string;
@@ -96,10 +99,10 @@ export default function RootLayout() {
           flex: 1,
           justifyContent: 'center',
           alignItems: 'center',
-          backgroundColor: '#121212',
+          backgroundColor: colors.black,
         }}
       >
-        <Text style={{ color: 'white' }}>Initializing framework...</Text>
+        <Text style={{ color: colors.white }}>Initializing framework...</Text>
       </View>
     );
   }
@@ -112,24 +115,30 @@ export default function RootLayout() {
           flex: 1,
           justifyContent: 'center',
           alignItems: 'center',
-          backgroundColor: '#121212',
-          padding: 20,
+          backgroundColor: colors.black,
+          padding: spacing.md,
         }}
       >
         <Text
           style={{
-            color: '#ef4444',
-            fontSize: 18,
-            fontWeight: 'bold',
-            marginBottom: 8,
+            color: colors.accent.error,
+            fontSize: fontSize.lg,
+            fontWeight: fontWeight.bold,
+            marginBottom: spacing.sm,
           }}
         >
           Initialization Error
         </Text>
-        <Text style={{ color: 'white', textAlign: 'center', marginBottom: 20 }}>
+        <Text
+          style={{
+            color: colors.white,
+            textAlign: 'center',
+            marginBottom: spacing.lg,
+          }}
+        >
           {privyInitError.message}
         </Text>
-        <Text style={{ color: '#aaa', textAlign: 'center' }}>
+        <Text style={{ color: colors.gray[400], textAlign: 'center' }}>
           Please check your configuration and try again.
         </Text>
       </View>
@@ -177,21 +186,21 @@ export default function RootLayout() {
           flex: 1,
           justifyContent: 'center',
           alignItems: 'center',
-          backgroundColor: '#121212',
-          padding: 20,
+          backgroundColor: colors.black,
+          padding: spacing.md,
         }}
       >
         <Text
           style={{
-            color: '#ef4444',
-            fontSize: 18,
-            fontWeight: 'bold',
-            marginBottom: 8,
+            color: colors.accent.error,
+            fontSize: fontSize.lg,
+            fontWeight: fontWeight.bold,
+            marginBottom: spacing.sm,
           }}
         >
           Privy Initialization Failed
         </Text>
-        <Text style={{ color: 'white', textAlign: 'center' }}>
+        <Text style={{ color: colors.white, textAlign: 'center' }}>
           {(error as Error).message}
         </Text>
       </View>

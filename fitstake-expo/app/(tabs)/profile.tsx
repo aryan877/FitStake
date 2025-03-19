@@ -1,15 +1,57 @@
-import { ChevronRight, Medal, Settings } from 'lucide-react-native';
-import React from 'react';
+import { usePrivy } from '@privy-io/expo';
+import { router } from 'expo-router';
+import { ChevronRight, LogOut, Medal, Settings } from 'lucide-react-native';
+import React, { useState } from 'react';
 import {
-  Image,
+  Alert,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import theme from '../theme';
+const { colors, spacing, borderRadius, fontSize, fontWeight, shadows } = theme;
+
+// Helper function to generate a color based on user ID
+const getColorFromUserId = (id: string): string => {
+  // Simple hash function for the ID to generate a hue value
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = id.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const h = hash % 360;
+  // Use S and L to ensure readable contrast on dark background
+  return `hsl(${h}, 70%, 55%)`;
+};
+
+// Component for generating avatar based on user ID
+const GeneratedAvatar = ({ userId }: { userId: string }) => {
+  const backgroundColor = getColorFromUserId(userId);
+  const initial = userId.substring(0, 2).toUpperCase();
+
+  return (
+    <View style={[styles.avatarContainer, { backgroundColor }]}>
+      <Text style={styles.avatarText}>{initial}</Text>
+    </View>
+  );
+};
 
 export default function ProfileScreen() {
+  const { user, logout } = usePrivy();
+  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      router.replace('/sign-in');
+    } catch (error) {
+      console.error('Logout error:', error);
+      Alert.alert('Logout Error', 'Failed to log out. Please try again.');
+    }
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scrollView}>
@@ -18,14 +60,8 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.profileCard}>
-          <Image
-            source={{
-              uri: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&h=200&fit=crop',
-            }}
-            style={styles.avatar}
-          />
-          <Text style={styles.name}>John Doe</Text>
-          <Text style={styles.email}>john@example.com</Text>
+          {user && <GeneratedAvatar userId={user.id} />}
+          <Text style={styles.name}>FitStake User</Text>
           <View style={styles.statsRow}>
             <View style={styles.stat}>
               <Text style={styles.statValue}>12</Text>
@@ -48,7 +84,7 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>Achievements</Text>
           <View style={styles.achievementsGrid}>
             <View style={styles.achievementItem}>
-              <Medal color="#FCD34D" size={32} />
+              <Medal color={colors.accent.warning} size={32} />
               <Text style={styles.achievementTitle}>First Win</Text>
             </View>
             {/* Add more achievements */}
@@ -59,14 +95,56 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>Settings</Text>
           <View style={styles.menuList}>
             <Pressable style={styles.menuItem}>
-              <Settings size={20} color="#fff" />
+              <Settings size={20} color={colors.white} />
               <Text style={styles.menuText}>App Settings</Text>
-              <ChevronRight size={20} color="#6B7280" />
+              <ChevronRight size={20} color={colors.gray[400]} />
+            </Pressable>
+            <Pressable
+              style={styles.menuItem}
+              onPress={() => setLogoutModalVisible(true)}
+            >
+              <LogOut size={20} color={colors.accent.error} />
+              <Text style={styles.menuTextLogout}>Logout</Text>
+              <ChevronRight size={20} color={colors.gray[400]} />
             </Pressable>
             {/* Add more menu items */}
           </View>
         </View>
       </ScrollView>
+
+      {/* Logout Confirmation Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={logoutModalVisible}
+        onRequestClose={() => setLogoutModalVisible(false)}
+      >
+        <View style={styles.centeredView}>
+          <View style={styles.modalView}>
+            <Text style={styles.modalTitle}>Confirm Logout</Text>
+            <Text style={styles.modalText}>
+              Are you sure you want to log out of your account?
+            </Text>
+            <View style={styles.modalButtons}>
+              <Pressable
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setLogoutModalVisible(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.modalButton, styles.logoutButton]}
+                onPress={() => {
+                  setLogoutModalVisible(false);
+                  handleLogout();
+                }}
+              >
+                <Text style={styles.logoutButtonText}>Logout</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -74,110 +152,177 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#111827',
+    backgroundColor: colors.black,
   },
   scrollView: {
     flex: 1,
   },
   header: {
-    padding: 20,
-    paddingTop: 60,
+    padding: spacing.md,
+    paddingTop: spacing.xxl + spacing.xl,
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 8,
+    fontSize: fontSize.xxxl,
+    fontWeight: fontWeight.bold,
+    color: colors.white,
+    marginBottom: spacing.sm,
   },
   profileCard: {
-    margin: 20,
-    padding: 24,
-    backgroundColor: '#1F2937',
-    borderRadius: 16,
+    margin: spacing.md,
+    padding: spacing.lg,
+    backgroundColor: colors.gray[900],
+    borderRadius: borderRadius.xl,
     alignItems: 'center',
+    ...shadows.md,
   },
-  avatar: {
+  avatarContainer: {
     width: 100,
     height: 100,
-    borderRadius: 50,
-    marginBottom: 16,
+    borderRadius: borderRadius.full,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  avatarText: {
+    color: colors.white,
+    fontSize: fontSize.xxxl,
+    fontWeight: fontWeight.bold,
   },
   name: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 4,
-  },
-  email: {
-    fontSize: 16,
-    color: '#9CA3AF',
-    marginBottom: 20,
+    fontSize: fontSize.xxl,
+    fontWeight: fontWeight.bold,
+    color: colors.white,
+    marginBottom: spacing.lg,
   },
   statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
-    paddingHorizontal: 16,
+    paddingHorizontal: spacing.md,
   },
   stat: {
     flex: 1,
     alignItems: 'center',
   },
   statValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontSize: fontSize.xxl,
+    fontWeight: fontWeight.bold,
+    color: colors.white,
   },
   statLabel: {
-    fontSize: 14,
-    color: '#9CA3AF',
-    marginTop: 4,
+    fontSize: fontSize.sm,
+    color: colors.gray[300],
+    marginTop: spacing.xs,
   },
   statDivider: {
     width: 1,
     height: 40,
-    backgroundColor: '#374151',
+    backgroundColor: colors.gray[700],
   },
   section: {
-    padding: 20,
+    padding: spacing.md,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 16,
+    fontSize: fontSize.xl,
+    fontWeight: fontWeight.bold,
+    color: colors.white,
+    marginBottom: spacing.md,
   },
   achievementsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: spacing.sm,
   },
   achievementItem: {
-    backgroundColor: '#1F2937',
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: colors.gray[900],
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
     alignItems: 'center',
     width: '31%',
+    ...shadows.sm,
   },
   achievementTitle: {
-    color: '#fff',
-    fontSize: 14,
-    marginTop: 8,
+    color: colors.white,
+    fontSize: fontSize.sm,
+    marginTop: spacing.sm,
     textAlign: 'center',
   },
   menuList: {
-    backgroundColor: '#1F2937',
-    borderRadius: 12,
+    backgroundColor: colors.gray[900],
+    borderRadius: borderRadius.lg,
+    ...shadows.sm,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    gap: 12,
+    padding: spacing.md,
+    gap: spacing.sm,
   },
   menuText: {
     flex: 1,
-    color: '#fff',
-    fontSize: 16,
+    color: colors.white,
+    fontSize: fontSize.md,
+  },
+  menuTextLogout: {
+    flex: 1,
+    color: colors.accent.error,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.medium,
+  },
+  // Modal styles
+  centeredView: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+  },
+  modalView: {
+    margin: spacing.md,
+    backgroundColor: colors.gray[900],
+    borderRadius: borderRadius.xl,
+    padding: spacing.lg,
+    alignItems: 'center',
+    ...shadows.lg,
+    width: '85%',
+  },
+  modalTitle: {
+    fontSize: fontSize.xl,
+    fontWeight: fontWeight.bold,
+    color: colors.white,
+    marginBottom: spacing.sm,
+  },
+  modalText: {
+    fontSize: fontSize.md,
+    color: colors.gray[200],
+    marginBottom: spacing.lg,
+    textAlign: 'center',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  modalButton: {
+    borderRadius: borderRadius.md,
+    padding: spacing.md - 2,
+    flex: 1,
+    marginHorizontal: spacing.sm,
+    ...shadows.sm,
+  },
+  cancelButton: {
+    backgroundColor: colors.gray[700],
+  },
+  logoutButton: {
+    backgroundColor: colors.accent.error,
+  },
+  cancelButtonText: {
+    color: colors.white,
+    fontWeight: fontWeight.semibold,
+    textAlign: 'center',
+  },
+  logoutButtonText: {
+    color: colors.white,
+    fontWeight: fontWeight.semibold,
+    textAlign: 'center',
   },
 });
