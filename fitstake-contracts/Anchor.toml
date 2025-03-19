@@ -1,0 +1,22 @@
+[features]
+seeds = false
+skip-lint = false
+
+[programs.localnet]
+accountability = "5F5w53HrCTKDarUUSrRWNppMxJiM2LYGLCuJhtAoGcbj"
+
+[programs.devnet]
+accountability = "5F5w53HrCTKDarUUSrRWNppMxJiM2LYGLCuJhtAoGcbj"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "devnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+
+[toolchain]
+anchor_version = "0.26.0" 

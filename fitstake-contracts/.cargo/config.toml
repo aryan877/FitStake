@@ -1,0 +1,8 @@
+[unstable]
+next-lockfile-bump = true
+
+[resolver]
+force-version = "2"
+
+[build]
+edition-2021-resolver-version-check = false 
