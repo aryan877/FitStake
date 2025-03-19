@@ -1,10 +1,8 @@
 import { Types } from "mongoose";
 
 export interface User {
-  id?: string;
-  email: string;
-  password: string;
-  walletAddress?: string;
+  privyId: string;
+  walletAddress: string;
   fitnessIntegrations: {
     googleFit: {
       connected: boolean;
@@ -58,30 +56,4 @@ export interface Participation {
     claimedAt: Date;
   };
   joinedAt: Date;
-}
-
-export interface JWTPayload {
-  userId: string;
-  email: string;
-}
-
-// Solana-specific types
-export interface SolanaAccount {
-  publicKey: string;
-  secretKey?: Uint8Array;
-}
-
-export interface ChallengeCreationParams {
-  challengeId: string;
-  stakeAmount: number;
-  startTime: number;
-  endTime: number;
-  minParticipants: number;
-  maxParticipants: number;
-}
-
-export interface SolanaTransactionResult {
-  success: boolean;
-  transactionId?: string;
-  error?: string;
 }
