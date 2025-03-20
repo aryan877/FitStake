@@ -29,7 +29,6 @@ const bundleId =
 // Get the URL scheme
 const urlScheme = Constants.expoConfig?.scheme || 'fitstake';
 
-// Determine if running in Expo Go - invert logic to match actual Expo Go behavior
 const isExpoGo = Constants.executionEnvironment !== 'standalone';
 const expoGoAppId = 'host.exp.Exponent';
 const expoGoUrlScheme = 'exp';

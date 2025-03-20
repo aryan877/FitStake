@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "scheme": "fitstake",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "assetBundlePatterns": ["**/*"],
     "ios": {
       "usesAppleSignIn": true,
@@ -28,7 +28,9 @@
         "android.permission.ACTIVITY_RECOGNITION",
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.FOREGROUND_SERVICE",
-        "android.permission.ACCESS_BACKGROUND_LOCATION"
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.health.READ_STEPS",
+        "android.permission.health.WRITE_STEPS"
       ]
     },
     "plugins": [
@@ -42,7 +44,9 @@
             "deploymentTarget": "17.5"
           },
           "android": {
-            "compileSdkVersion": 34
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 34,
+            "minSdkVersion": 26
           }
         }
       ],
@@ -53,11 +57,21 @@
           "healthUpdatePermission": "FitStake needs access to update your health data for challenge tracking."
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-health-connect"
     ],
     "experiments": {
       "typedRoutes": true,
       "tsconfigPaths": true
-    }
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "6c35e00c-8d8e-40ac-913e-5de494bde9cb"
+      }
+    },
+    "owner": "aryankumar877"
   }
 }

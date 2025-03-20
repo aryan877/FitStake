@@ -1,8 +1,18 @@
 import { usePrivy } from '@privy-io/expo';
+import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
 import { router } from 'expo-router';
-import { ChevronRight, LogOut, Medal, Settings } from 'lucide-react-native';
-import React, { useState } from 'react';
 import {
+  ActivitySquare,
+  ChevronRight,
+  Footprints,
+  LogOut,
+  Medal,
+  Settings,
+} from 'lucide-react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
   Alert,
   Modal,
   Pressable,
@@ -11,7 +21,12 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useHealthConnect } from '../../hooks/useHealthConnect';
 import theme from '../theme';
+
+// Initialize dayjs plugins
+dayjs.extend(relativeTime);
+
 const { colors, spacing, borderRadius, fontSize, fontWeight, shadows } = theme;
 
 // Helper function to generate a color based on user ID
@@ -34,6 +49,181 @@ const GeneratedAvatar = ({ userId }: { userId: string }) => {
   return (
     <View style={[styles.avatarContainer, { backgroundColor }]}>
       <Text style={styles.avatarText}>{initial}</Text>
+    </View>
+  );
+};
+
+// Helper function to format date string using dayjs
+const formatDateString = (dateString: string) => {
+  // First try to parse with dayjs directly
+  let date = dayjs(dateString);
+
+  // If invalid, try to parse assuming MM/DD/YYYY format (common in US locale)
+  if (!date.isValid()) {
+    const parts = dateString.split('/');
+    if (parts.length === 3) {
+      // American format: MM/DD/YYYY
+      date = dayjs(
+        `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`
+      );
+    }
+  }
+
+  // If still invalid, return a fallback
+  if (!date.isValid()) {
+    return 'Unknown date';
+  }
+
+  const today = dayjs();
+
+  if (date.isSame(today, 'day')) {
+    return 'Today';
+  } else if (date.isSame(today.subtract(1, 'day'), 'day')) {
+    return 'Yesterday';
+  }
+
+  // Format as "Feb 13"
+  return date.format('MMM D');
+};
+
+// Steps data component
+const StepsDataCard = () => {
+  const {
+    isAndroid,
+    stepsData,
+    loading,
+    error,
+    hasPermissions,
+    refreshStepsData,
+    setupHealthConnect,
+  } = useHealthConnect();
+
+  useEffect(() => {
+    console.log('StepsDataCard mounted, isAndroid:', isAndroid);
+    console.log('hasPermissions:', hasPermissions);
+    console.log('stepsData:', stepsData);
+    console.log('loading:', loading);
+    console.log('error:', error);
+
+    if (isAndroid) {
+      console.log('Manually triggering setupHealthConnect from StepsDataCard');
+      setupHealthConnect();
+    }
+  }, [isAndroid, hasPermissions, loading, error, setupHealthConnect]);
+
+  if (!isAndroid) {
+    return (
+      <View style={styles.stepsCard}>
+        <View style={styles.stepsCardHeader}>
+          <Footprints color={colors.accent.primary} size={24} />
+          <Text style={styles.stepsCardTitle}>Steps Data</Text>
+        </View>
+        <Text style={styles.stepsCardSubtitle}>
+          Health Connect is only available on Android devices.
+        </Text>
+      </View>
+    );
+  }
+
+  if (loading) {
+    return (
+      <View style={styles.stepsCard}>
+        <View style={styles.stepsCardHeader}>
+          <Footprints color={colors.accent.primary} size={24} />
+          <Text style={styles.stepsCardTitle}>Steps Data</Text>
+        </View>
+        <ActivityIndicator
+          color={colors.accent.primary}
+          size="large"
+          style={styles.loader}
+        />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.stepsCard}>
+        <View style={styles.stepsCardHeader}>
+          <Footprints color={colors.accent.primary} size={24} />
+          <Text style={styles.stepsCardTitle}>Steps Data</Text>
+        </View>
+        <Text style={styles.stepsCardError}>{error}</Text>
+        <Pressable
+          style={styles.actionButton}
+          onPress={() => refreshStepsData()}
+        >
+          <Text style={styles.actionButtonText}>Retry</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (!hasPermissions) {
+    return (
+      <View style={styles.stepsCard}>
+        <View style={styles.stepsCardHeader}>
+          <Footprints color={colors.accent.primary} size={24} />
+          <Text style={styles.stepsCardTitle}>Steps Data</Text>
+        </View>
+        <Text style={styles.stepsCardSubtitle}>
+          Permission required to access steps data
+        </Text>
+        <Pressable
+          style={styles.actionButton}
+          onPress={() => refreshStepsData()}
+        >
+          <Text style={styles.actionButtonText}>Grant Permission</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.stepsCard}>
+      <View style={styles.stepsCardHeader}>
+        <Footprints color={colors.accent.primary} size={24} />
+        <Text style={styles.stepsCardTitle}>Steps Data</Text>
+      </View>
+
+      {stepsData.length === 0 ? (
+        <View style={styles.emptyStateContainer}>
+          <ActivitySquare color={colors.gray[400]} size={40} />
+          <Text style={styles.stepsCardSubtitle}>No steps data available</Text>
+        </View>
+      ) : (
+        <View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.cardsScrollContainer}
+          >
+            {stepsData.map((data, index) => (
+              <View key={index} style={styles.stepsDayCard}>
+                <Text style={styles.stepsDate}>
+                  {formatDateString(data.date)}
+                </Text>
+                <View style={styles.stepsCountContainer}>
+                  <Footprints
+                    size={24}
+                    color={
+                      data.count > 0 ? colors.accent.primary : colors.gray[600]
+                    }
+                  />
+                  <Text style={styles.stepsCountText}>{data.count}</Text>
+                </View>
+              </View>
+            ))}
+          </ScrollView>
+
+          <Pressable
+            style={styles.refreshButton}
+            onPress={() => refreshStepsData()}
+          >
+            <Text style={styles.refreshButtonText}>Refresh Data</Text>
+          </Pressable>
+        </View>
+      )}
     </View>
   );
 };
@@ -78,6 +268,12 @@ export default function ProfileScreen() {
               <Text style={styles.statLabel}>SOL Earned</Text>
             </View>
           </View>
+        </View>
+
+        {/* Health Connect Steps Data */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Health Data</Text>
+          <StepsDataCard />
         </View>
 
         <View style={styles.section}>
@@ -324,5 +520,93 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontWeight: fontWeight.semibold,
     textAlign: 'center',
+  },
+  // Steps data card styles
+  stepsCard: {
+    backgroundColor: colors.gray[900],
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    ...shadows.sm,
+    marginBottom: spacing.md,
+  },
+  stepsCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  stepsCardTitle: {
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.bold,
+    color: colors.white,
+    marginLeft: spacing.sm,
+  },
+  stepsCardSubtitle: {
+    fontSize: fontSize.md,
+    color: colors.gray[300],
+    marginBottom: spacing.sm,
+  },
+  stepsCardError: {
+    fontSize: fontSize.md,
+    color: colors.accent.error,
+    marginBottom: spacing.sm,
+  },
+  actionButton: {
+    backgroundColor: colors.accent.primary,
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+    alignItems: 'center',
+    marginTop: spacing.sm,
+  },
+  actionButtonText: {
+    color: colors.white,
+    fontWeight: fontWeight.medium,
+  },
+  emptyStateContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.lg,
+  },
+  cardsScrollContainer: {
+    paddingRight: spacing.md,
+    paddingBottom: spacing.xs,
+  },
+  stepsDayCard: {
+    backgroundColor: colors.gray[800],
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    marginRight: spacing.md,
+    width: 120,
+    ...shadows.sm,
+  },
+  stepsDate: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium,
+    color: colors.accent.primary,
+    marginBottom: spacing.md,
+    textAlign: 'center',
+  },
+  stepsCountContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepsCountText: {
+    fontSize: fontSize.xl,
+    fontWeight: fontWeight.bold,
+    color: colors.white,
+    marginTop: spacing.xs,
+  },
+  refreshButton: {
+    backgroundColor: colors.gray[800],
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+    alignItems: 'center',
+    marginTop: spacing.md,
+  },
+  refreshButtonText: {
+    color: colors.accent.primary,
+    fontWeight: fontWeight.medium,
+  },
+  loader: {
+    marginVertical: spacing.lg,
   },
 });

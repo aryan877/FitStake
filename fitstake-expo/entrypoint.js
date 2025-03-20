@@ -6,9 +6,27 @@ global.Buffer = Buffer;
 import '@ethersproject/shims';
 import 'fast-text-encoding';
 import 'react-native-get-random-values';
+// Import the crypto module from expo-crypto instead of using v4 from uuid
+import * as Crypto from 'expo-crypto';
 
-// UUID polyfill (automatically adds crypto.randomUUID to global)
-import 'react-native-random-uuid';
+// Ensure crypto is available
+if (!global.crypto) {
+  global.crypto = {};
+}
+
+// Ensure getRandomValues is available (should be provided by react-native-get-random-values)
+if (!global.crypto.getRandomValues) {
+  console.warn(
+    'crypto.getRandomValues is not available. This might cause issues with cryptographic operations.'
+  );
+}
+
+// Proper UUID implementation using expo-crypto
+if (typeof global.crypto.randomUUID !== 'function') {
+  global.crypto.randomUUID = function randomUUID() {
+    return Crypto.randomUUID();
+  };
+}
 
 // Then import the expo router
 import 'expo-router/entry';
