@@ -1,7 +1,14 @@
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 import Challenge from "../models/challenge.model";
+import UserModel from "../models/user.model";
+import ApiError from "../utils/ApiError";
+import ApiResponse from "../utils/ApiResponse";
 
-export const getChallenges = async (req: Request, res: Response) => {
+export const getChallenges = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const { type, limit = 10, page = 1 } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
@@ -22,63 +29,76 @@ export const getChallenges = async (req: Request, res: Response) => {
     // Get total count for pagination
     const total = await Challenge.countDocuments(query);
 
-    res.status(200).json({
-      success: true,
-      data: challenges,
-      pagination: {
-        total,
-        page: Number(page),
-        limit: Number(limit),
-        pages: Math.ceil(total / Number(limit)),
-      },
-    });
+    return res.status(200).json(
+      new ApiResponse(
+        200,
+        {
+          challenges,
+          pagination: {
+            total,
+            page: Number(page),
+            limit: Number(limit),
+            pages: Math.ceil(total / Number(limit)),
+          },
+        },
+        "Challenges retrieved successfully"
+      )
+    );
   } catch (error) {
     console.error("Error fetching challenges:", error);
-    res.status(500).json({
-      success: false,
-      error: "Failed to fetch challenges",
-    });
+    return next(new ApiError(500, "Failed to fetch challenges"));
   }
 };
 
-export const getChallengeById = async (req: Request, res: Response) => {
+export const getChallengeById = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const { id } = req.params;
 
     const challenge = await Challenge.findById(id);
 
     if (!challenge) {
-      return res.status(404).json({
-        success: false,
-        error: "Challenge not found",
-      });
+      return next(new ApiError(404, "Challenge not found"));
     }
 
-    res.status(200).json({
-      success: true,
-      data: challenge,
-    });
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(200, challenge, "Challenge retrieved successfully")
+      );
   } catch (error) {
     console.error("Error fetching challenge:", error);
-    res.status(500).json({
-      success: false,
-      error: "Failed to fetch challenge",
-    });
+    return next(new ApiError(500, "Failed to fetch challenge"));
   }
 };
 
-export const getUserChallenges = async (req: Request, res: Response) => {
+export const getUserChallenges = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: "Authentication required",
-      });
+      return next(new ApiError(401, "Authentication required"));
     }
 
     const { did } = req.user;
     const { status, limit = 10, page = 1 } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
+
+    // Verify user has wallet address
+    const user = await UserModel.findOne({ privyId: did });
+    if (!user || !user.walletAddress) {
+      return next(
+        new ApiError(
+          400,
+          "Wallet address not set. Please connect your wallet first."
+        )
+      );
+    }
 
     // Find challenges where the user is a participant
     const query: any = {
@@ -97,41 +117,57 @@ export const getUserChallenges = async (req: Request, res: Response) => {
 
     const total = await Challenge.countDocuments(query);
 
-    res.status(200).json({
-      success: true,
-      data: challenges,
-      pagination: {
-        total,
-        page: Number(page),
-        limit: Number(limit),
-        pages: Math.ceil(total / Number(limit)),
-      },
-    });
+    return res.status(200).json(
+      new ApiResponse(
+        200,
+        {
+          challenges,
+          pagination: {
+            total,
+            page: Number(page),
+            limit: Number(limit),
+            pages: Math.ceil(total / Number(limit)),
+          },
+        },
+        "User challenges retrieved successfully"
+      )
+    );
   } catch (error) {
     console.error("Error fetching user challenges:", error);
-    res.status(500).json({
-      success: false,
-      error: "Failed to fetch user challenges",
-    });
+    return next(new ApiError(500, "Failed to fetch user challenges"));
   }
 };
 
-export const createChallenge = async (req: Request, res: Response) => {
+export const createChallenge = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: "Authentication required",
-      });
+      return next(new ApiError(401, "Authentication required"));
     }
 
     const { did } = req.user;
+
+    // Verify user has wallet address
+    const user = await UserModel.findOne({ privyId: did });
+    if (!user || !user.walletAddress) {
+      return next(
+        new ApiError(
+          400,
+          "Wallet address not set. Please connect your wallet first."
+        )
+      );
+    }
+
     const challengeData = {
       ...req.body,
       createdBy: did,
       participants: [
         {
           did,
+          walletAddress: user.walletAddress,
           status: "ACTIVE",
           joinedAt: new Date(),
         },
@@ -141,38 +177,43 @@ export const createChallenge = async (req: Request, res: Response) => {
     const challenge = new Challenge(challengeData);
     await challenge.save();
 
-    res.status(201).json({
-      success: true,
-      data: challenge,
-    });
+    return res
+      .status(201)
+      .json(new ApiResponse(201, challenge, "Challenge created successfully"));
   } catch (error) {
     console.error("Error creating challenge:", error);
-    res.status(500).json({
-      success: false,
-      error: "Failed to create challenge",
-    });
+    return next(new ApiError(500, "Failed to create challenge"));
   }
 };
 
-export const joinChallenge = async (req: Request, res: Response) => {
+export const joinChallenge = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: "Authentication required",
-      });
+      return next(new ApiError(401, "Authentication required"));
     }
 
     const { did } = req.user;
     const { id } = req.params;
 
+    // Verify user has wallet address
+    const user = await UserModel.findOne({ privyId: did });
+    if (!user || !user.walletAddress) {
+      return next(
+        new ApiError(
+          400,
+          "Wallet address not set. Please connect your wallet first."
+        )
+      );
+    }
+
     const challenge = await Challenge.findById(id);
 
     if (!challenge) {
-      return res.status(404).json({
-        success: false,
-        error: "Challenge not found",
-      });
+      return next(new ApiError(404, "Challenge not found"));
     }
 
     // Check if the user is already a participant
@@ -181,15 +222,13 @@ export const joinChallenge = async (req: Request, res: Response) => {
     );
 
     if (isParticipant) {
-      return res.status(400).json({
-        success: false,
-        error: "You have already joined this challenge",
-      });
+      return next(new ApiError(400, "You have already joined this challenge"));
     }
 
     // Add the user as a participant
     challenge.participants.push({
       did,
+      walletAddress: user.walletAddress,
       status: "ACTIVE",
       joinedAt: new Date(),
     });
@@ -199,46 +238,48 @@ export const joinChallenge = async (req: Request, res: Response) => {
 
     await challenge.save();
 
-    res.status(200).json({
-      success: true,
-      data: challenge,
-    });
+    return res
+      .status(200)
+      .json(new ApiResponse(200, challenge, "Successfully joined challenge"));
   } catch (error) {
     console.error("Error joining challenge:", error);
-    res.status(500).json({
-      success: false,
-      error: "Failed to join challenge",
-    });
+    return next(new ApiError(500, "Failed to join challenge"));
   }
 };
 
-export const updateChallengeStatus = async (req: Request, res: Response) => {
+export const updateChallengeStatus = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: "Authentication required",
-      });
+      return next(new ApiError(401, "Authentication required"));
     }
 
     const { did } = req.user;
     const { id } = req.params;
     const { status } = req.body;
 
+    // Verify user has wallet address
+    const user = await UserModel.findOne({ privyId: did });
+    if (!user || !user.walletAddress) {
+      return next(
+        new ApiError(
+          400,
+          "Wallet address not set. Please connect your wallet first."
+        )
+      );
+    }
+
     if (!["ACTIVE", "COMPLETED", "FAILED"].includes(status)) {
-      return res.status(400).json({
-        success: false,
-        error: "Invalid status",
-      });
+      return next(new ApiError(400, "Invalid status"));
     }
 
     const challenge = await Challenge.findById(id);
 
     if (!challenge) {
-      return res.status(404).json({
-        success: false,
-        error: "Challenge not found",
-      });
+      return next(new ApiError(404, "Challenge not found"));
     }
 
     // Find the user's participation record
@@ -247,10 +288,9 @@ export const updateChallengeStatus = async (req: Request, res: Response) => {
     );
 
     if (participantIndex === -1) {
-      return res.status(400).json({
-        success: false,
-        error: "You are not a participant in this challenge",
-      });
+      return next(
+        new ApiError(400, "You are not a participant in this challenge")
+      );
     }
 
     // Update the status
@@ -266,15 +306,13 @@ export const updateChallengeStatus = async (req: Request, res: Response) => {
 
     await challenge.save();
 
-    res.status(200).json({
-      success: true,
-      data: challenge,
-    });
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(200, challenge, "Challenge status updated successfully")
+      );
   } catch (error) {
     console.error("Error updating challenge status:", error);
-    res.status(500).json({
-      success: false,
-      error: "Failed to update challenge status",
-    });
+    return next(new ApiError(500, "Failed to update challenge status"));
   }
 };

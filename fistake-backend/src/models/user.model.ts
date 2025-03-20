@@ -14,21 +14,10 @@ const userSchema = new Schema<UserDocument>({
     required: true,
     unique: true,
   },
-  fitnessIntegrations: {
-    googleFit: {
-      connected: { type: Boolean, default: false },
-      accessToken: { type: String },
-      refreshToken: { type: String },
-    },
-    appleHealth: {
-      connected: { type: Boolean, default: false },
-      userId: { type: String },
-    },
-    fitbit: {
-      connected: { type: Boolean, default: false },
-      accessToken: { type: String },
-      refreshToken: { type: String },
-    },
+  username: {
+    type: String,
+    required: true,
+    unique: true,
   },
   createdAt: {
     type: Date,

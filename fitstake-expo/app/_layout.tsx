@@ -1,12 +1,15 @@
-import { PrivyElements, PrivyProvider } from '@privy-io/expo';
+import { PrivyElements, PrivyProvider, usePrivy } from '@privy-io/expo';
 import * as Application from 'expo-application';
 import Constants from 'expo-constants';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as React from 'react';
 import { Alert, Platform, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFrameworkReady } from '../hooks/useFrameworkReady';
+import OnboardingModal from './components/OnboardingModal';
+import ToastContainer from './components/Toast';
+import { authApi } from './services/api';
 import theme from './theme';
 
 const { colors, fontSize, fontWeight, spacing } = theme;
@@ -47,6 +50,87 @@ declare global {
       };
     };
   }
+}
+
+// The component that wraps the app and handles onboarding
+function AppWithOnboarding() {
+  const { user, isReady } = usePrivy();
+  const router = useRouter();
+  const [showOnboarding, setShowOnboarding] = React.useState(false);
+  const [onboardingComplete, setOnboardingComplete] = React.useState(false);
+  const [isCheckingProfile, setIsCheckingProfile] = React.useState(false);
+
+  // Check if the user has a profile in the backend
+  React.useEffect(() => {
+    const checkUserProfile = async () => {
+      if (!isReady || !user) return;
+
+      try {
+        setIsCheckingProfile(true);
+        const response = await authApi.getUserProfile();
+        // If we get a successful response, the user has a profile
+        if (response.data) {
+          setOnboardingComplete(true);
+        }
+      } catch (error: any) {
+        // If we get a 404, the user doesn't have a profile
+        if (error.response?.status === 404) {
+          setShowOnboarding(true);
+        } else {
+          console.error('Error checking user profile:', error);
+        }
+      } finally {
+        setIsCheckingProfile(false);
+      }
+    };
+
+    checkUserProfile();
+  }, [isReady, user]);
+
+  // Handle route changes based on auth state
+  React.useEffect(() => {
+    if (!isReady) return;
+
+    if (user) {
+      // If authenticated but onboarding not complete, show onboarding
+      if (!onboardingComplete) {
+        setShowOnboarding(true);
+      } else {
+        // Otherwise, navigate to the app
+        router.replace('/(tabs)');
+      }
+    } else {
+      // If not authenticated, go to sign-in
+      router.replace('/sign-in');
+    }
+  }, [isReady, user, onboardingComplete, router]);
+
+  const handleOnboardingComplete = () => {
+    setShowOnboarding(false);
+    setOnboardingComplete(true);
+    router.replace('/(tabs)');
+  };
+
+  return (
+    <>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="sign-in" />
+        <Stack.Screen name="(app)" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen
+          name="+not-found"
+          options={{ presentation: 'modal', headerShown: true }}
+        />
+      </Stack>
+      <StatusBar style="light" />
+      <PrivyElements />
+      <ToastContainer />
+      <OnboardingModal
+        visible={showOnboarding}
+        onComplete={handleOnboardingComplete}
+      />
+    </>
+  );
 }
 
 export default function RootLayout() {
@@ -149,28 +233,8 @@ export default function RootLayout() {
   try {
     return (
       <SafeAreaProvider>
-        <PrivyProvider
-          appId={PRIVY_APP_ID}
-          clientId={PRIVY_CLIENT_ID}
-          config={{
-            embedded: {
-              solana: {
-                createOnLogin: 'users-without-wallets',
-              },
-            },
-          }}
-        >
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="sign-in" />
-            <Stack.Screen name="(app)" />
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen
-              name="+not-found"
-              options={{ presentation: 'modal', headerShown: true }}
-            />
-          </Stack>
-          <StatusBar style="light" />
-          <PrivyElements />
+        <PrivyProvider appId={PRIVY_APP_ID} clientId={PRIVY_CLIENT_ID}>
+          <AppWithOnboarding />
         </PrivyProvider>
       </SafeAreaProvider>
     );

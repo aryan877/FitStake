@@ -3,22 +3,7 @@ import { Types } from "mongoose";
 export interface User {
   privyId: string;
   walletAddress: string;
-  fitnessIntegrations: {
-    googleFit: {
-      connected: boolean;
-      accessToken?: string;
-      refreshToken?: string;
-    };
-    appleHealth: {
-      connected: boolean;
-      userId?: string;
-    };
-    fitbit: {
-      connected: boolean;
-      accessToken?: string;
-      refreshToken?: string;
-    };
-  };
+  username: string;
   createdAt: Date;
 }
 
@@ -26,7 +11,7 @@ export interface Challenge {
   id?: string;
   title: string;
   description: string;
-  type: "steps" | "distance" | "workout" | "custom";
+  type: "STEPS";
   goal: number;
   unit: string;
   stakeAmount: number;

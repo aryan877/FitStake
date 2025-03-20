@@ -32,13 +32,13 @@ const challengeTemplates = [
     },
   },
   {
-    title: "30 Minute Workout Streak",
+    title: "5K Steps Challenge",
     description:
-      "Exercise for at least 30 minutes every day for 5 days. Track your workouts to win!",
-    type: "WORKOUT",
+      "Complete 5,000 steps every day for the next 5 days. Perfect for beginners!",
+    type: "STEPS",
     goal: {
-      value: 30,
-      unit: "minutes",
+      value: 5000,
+      unit: "steps",
     },
     duration: {
       days: 5,
@@ -49,13 +49,13 @@ const challengeTemplates = [
     },
   },
   {
-    title: "8 Hour Sleep Challenge",
+    title: "Weekly Step Master",
     description:
-      "Sleep at least 8 hours every night for 7 days to improve your health and win rewards!",
-    type: "SLEEP",
+      "Achieve 70,000 steps in a week to become a step master and earn rewards!",
+    type: "STEPS",
     goal: {
-      value: 8,
-      unit: "hours",
+      value: 70000,
+      unit: "steps",
     },
     duration: {
       days: 7,
@@ -66,13 +66,13 @@ const challengeTemplates = [
     },
   },
   {
-    title: "Meditation Streak",
+    title: "Step Up Challenge",
     description:
-      "Meditate for at least 10 minutes daily for the next 10 days to build a healthy habit!",
-    type: "CUSTOM",
+      "Take 8,000 steps daily for the next 10 days to build a consistent walking habit!",
+    type: "STEPS",
     goal: {
-      value: 10,
-      unit: "minutes",
+      value: 8000,
+      unit: "steps",
     },
     duration: {
       days: 10,
@@ -87,6 +87,12 @@ const challengeTemplates = [
 // Function to create challenges for the test user
 const createChallenges = async (userDid: string) => {
   const challenges = [];
+
+  // Get the user to access their wallet address
+  const user = await User.findOne({ privyId: userDid });
+  if (!user) {
+    throw new Error("Test user not found");
+  }
 
   for (const template of challengeTemplates) {
     const now = new Date();
@@ -104,6 +110,7 @@ const createChallenges = async (userDid: string) => {
       participants: [
         {
           did: userDid,
+          walletAddress: user.walletAddress,
           status: "ACTIVE",
           joinedAt: new Date(),
         },
@@ -136,11 +143,6 @@ async function seed() {
     const user = await User.create({
       privyId: TEST_USER.privyId,
       walletAddress: TEST_USER.walletAddress,
-      fitnessIntegrations: {
-        googleFit: { connected: false },
-        appleHealth: { connected: false },
-        fitbit: { connected: false },
-      },
     });
     console.log("Test user created", user._id);
 

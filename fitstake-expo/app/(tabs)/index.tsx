@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { challengeApi } from '../services/api';
 import theme from '../theme';
+import { showErrorToast, showSuccessToast } from '../utils/errorHandling';
 
 const { colors, spacing, borderRadius, fontSize, fontWeight, shadows } = theme;
 
@@ -59,10 +60,18 @@ export default function ChallengesScreen() {
       setLoading(true);
       setError(null);
       const response = await challengeApi.getAll();
-      setChallenges(response.data || []);
+
+      // Handle the new API response format
+      if (response.success && response.data && response.data.challenges) {
+        setChallenges(response.data.challenges);
+      } else {
+        // If we don't have challenges array, set empty array
+        setChallenges([]);
+      }
     } catch (err) {
       console.error('Error fetching challenges:', err);
       setError('Failed to load challenges. Please try again later.');
+      showErrorToast(err, 'Failed to load challenges');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -79,15 +88,14 @@ export default function ChallengesScreen() {
         return;
       }
 
-      await challengeApi.join(challengeId);
-      fetchChallenges();
-      Alert.alert('Success', 'You have successfully joined the challenge!');
-    } catch (err: any) {
-      // Extract error message from the API response if available
-      const errorMessage =
-        err.response?.data?.error ||
-        'Failed to join the challenge. Please try again.';
-      Alert.alert('Error', errorMessage);
+      const response = await challengeApi.join(challengeId);
+      if (response.success) {
+        fetchChallenges();
+        showSuccessToast('You have successfully joined the challenge!');
+      }
+    } catch (err) {
+      console.error('Error joining challenge:', err);
+      showErrorToast(err, 'Failed to join the challenge');
     }
   };
 

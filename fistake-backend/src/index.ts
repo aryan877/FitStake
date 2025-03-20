@@ -6,6 +6,8 @@ import helmet from "helmet";
 import mongoose from "mongoose";
 import morgan from "morgan";
 
+import { errorHandler, notFound } from "./middleware/error.middleware";
+import authRoutes from "./routes/auth.routes";
 import challengeRoutes from "./routes/challenge.routes";
 
 dotenv.config();
@@ -26,27 +28,18 @@ app.use(morgan("dev"));
 
 // Routes
 app.use("/api/challenges", challengeRoutes);
+app.use("/api/auth", authRoutes);
 
 // Health check route
 app.get("/health", (req, res) => {
   res.status(200).json({ status: "ok" });
 });
 
+// Not found middleware
+app.use(notFound);
+
 // Error handling middleware
-app.use(
-  (
-    err: Error,
-    req: express.Request,
-    res: express.Response,
-    next: express.NextFunction
-  ) => {
-    console.error(err.stack);
-    res.status(500).json({
-      error: "Something went wrong!",
-      message: process.env.NODE_ENV === "development" ? err.message : undefined,
-    });
-  }
-);
+app.use(errorHandler);
 
 // MongoDB connection
 const connectDB = async () => {

@@ -36,6 +36,44 @@ api.interceptors.request.use(
   }
 );
 
+// Auth endpoints
+export const authApi = {
+  // Get user profile
+  getUserProfile: async () => {
+    try {
+      const response = await api.get('/auth/user');
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Create or update user with wallet
+  createOrUpdateUser: async (walletAddress: string, username?: string) => {
+    try {
+      const response = await api.post('/auth/user', {
+        walletAddress,
+        username,
+      });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Check if username is available
+  checkUsername: async (username: string) => {
+    try {
+      const response = await api.get('/auth/check-username', {
+        params: { username },
+      });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+};
+
 // Challenge endpoints
 export const challengeApi = {
   // Get all challenges with pagination and filters
@@ -51,7 +89,6 @@ export const challengeApi = {
       const response = await api.get('/challenges', { params });
       return response.data;
     } catch (error) {
-      console.error('Error fetching challenges:', error);
       throw error;
     }
   },

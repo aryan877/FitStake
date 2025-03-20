@@ -3,7 +3,7 @@ import mongoose, { Document, Schema } from "mongoose";
 export interface Challenge extends Document {
   title: string;
   description: string;
-  type: "STEPS" | "WORKOUT" | "SLEEP" | "CUSTOM";
+  type: "STEPS";
   goal: {
     value: number;
     unit: string;
@@ -19,6 +19,7 @@ export interface Challenge extends Document {
   };
   participants: {
     did: string;
+    walletAddress: string;
     status: "ACTIVE" | "COMPLETED" | "FAILED";
     joinedAt: Date;
   }[];
@@ -44,7 +45,7 @@ const ChallengeSchema: Schema = new Schema(
     },
     type: {
       type: String,
-      enum: ["STEPS", "WORKOUT", "SLEEP", "CUSTOM"],
+      enum: ["STEPS"],
       required: true,
     },
     goal: {
@@ -83,6 +84,10 @@ const ChallengeSchema: Schema = new Schema(
     participants: [
       {
         did: {
+          type: String,
+          required: true,
+        },
+        walletAddress: {
           type: String,
           required: true,
         },
