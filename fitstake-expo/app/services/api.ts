@@ -72,6 +72,17 @@ export const authApi = {
       throw error;
     }
   },
+
+  // Update username
+  updateUsername: async (username: string) => {
+    try {
+      const response = await api.patch('/auth/user', { username });
+      return response.data;
+    } catch (error) {
+      console.error('Error updating username:', error);
+      throw error;
+    }
+  },
 };
 
 // Challenge endpoints

@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import UserModel from "../models/user.model";
 import ApiError from "../utils/ApiError";
 import ApiResponse from "../utils/ApiResponse";
+import { validateUsername } from "../utils/validators";
 
 export const getUserProfile = async (
   req: Request,
@@ -58,6 +59,16 @@ export const createOrUpdateUser = async (
       return next(new ApiError(400, "Wallet address is required"));
     }
 
+    // Validate username if provided
+    if (username && !validateUsername(username)) {
+      return next(
+        new ApiError(
+          400,
+          "Username must be 3-20 alphanumeric characters or underscores"
+        )
+      );
+    }
+
     // Generate a random username if not provided
     const generatedUsername = username || `user_${uuidv4().substring(0, 8)}`;
 
@@ -70,6 +81,16 @@ export const createOrUpdateUser = async (
         user.walletAddress = walletAddress;
       }
       if (username && user.username !== username) {
+        // Check if new username is already taken by another user
+        const existingUser = await UserModel.findOne({
+          username,
+          privyId: { $ne: did },
+        });
+
+        if (existingUser) {
+          return next(new ApiError(400, "Username already taken"));
+        }
+
         user.username = username;
       }
       await user.save();
@@ -111,6 +132,16 @@ export const checkUsername = async (
       return next(new ApiError(400, "Username is required"));
     }
 
+    // Validate username format
+    if (!validateUsername(username)) {
+      return next(
+        new ApiError(
+          400,
+          "Username must be 3-20 alphanumeric characters or underscores"
+        )
+      );
+    }
+
     // Check if username exists
     const existingUser = await UserModel.findOne({ username });
 
@@ -118,7 +149,7 @@ export const checkUsername = async (
       new ApiResponse(
         200,
         {
-          available: !existingUser,
+          isAvailable: !existingUser,
           username,
         },
         "Username availability checked successfully"
@@ -127,5 +158,85 @@ export const checkUsername = async (
   } catch (error) {
     console.error("Username check error:", error);
     return next(new ApiError(500, "Error checking username availability"));
+  }
+};
+
+export const updateUsername = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { username } = req.body;
+
+    if (!req.user) {
+      return next(new ApiError(401, "Authentication required"));
+    }
+
+    const { did } = req.user;
+
+    if (!username || typeof username !== "string") {
+      return next(new ApiError(400, "Username is required"));
+    }
+
+    // Validate username format
+    if (!validateUsername(username)) {
+      return next(
+        new ApiError(
+          400,
+          "Username must be 3-20 alphanumeric characters or underscores"
+        )
+      );
+    }
+
+    // Find user by Privy ID
+    const user = await UserModel.findOne({ privyId: did });
+
+    if (!user) {
+      return next(new ApiError(404, "User not found"));
+    }
+
+    // No change needed if username is the same
+    if (user.username === username) {
+      return res.status(200).json(
+        new ApiResponse(
+          200,
+          {
+            privyId: user.privyId,
+            username: user.username,
+          },
+          "Username is unchanged"
+        )
+      );
+    }
+
+    // Check if username is taken
+    const existingUser = await UserModel.findOne({
+      username,
+      privyId: { $ne: did },
+    });
+
+    if (existingUser) {
+      return next(new ApiError(400, "Username already taken"));
+    }
+
+    // Update username
+    user.username = username;
+    await user.save();
+
+    return res.status(200).json(
+      new ApiResponse(
+        200,
+        {
+          privyId: user.privyId,
+          username: user.username,
+          success: true,
+        },
+        "Username updated successfully"
+      )
+    );
+  } catch (error) {
+    console.error("Username update error:", error);
+    return next(new ApiError(500, "Error updating username"));
   }
 };

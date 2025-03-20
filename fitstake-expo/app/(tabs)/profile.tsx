@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import {
   ActivitySquare,
   ChevronRight,
+  Edit,
   Footprints,
   LogOut,
   Medal,
@@ -12,16 +13,22 @@ import {
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { useHealthConnect } from '../../hooks/useHealthConnect';
+import { authApi } from '../services/api';
 import theme from '../theme';
+import {
+  handleApiError,
+  showErrorToast,
+  showSuccessToast,
+} from '../utils/errorHandling';
 
 // Initialize dayjs plugins
 dayjs.extend(relativeTime);
@@ -41,9 +48,9 @@ const getColorFromUserId = (id: string): string => {
 };
 
 // Component for generating avatar based on user ID
-const GeneratedAvatar = ({ userId }: { userId: string }) => {
-  const backgroundColor = getColorFromUserId(userId);
-  const initial = userId.substring(0, 2).toUpperCase();
+const GeneratedAvatar = ({ username }: { username: string }) => {
+  const backgroundColor = getColorFromUserId(username);
+  const initial = username.substring(0, 1).toUpperCase();
 
   return (
     <View style={[styles.avatarContainer, { backgroundColor }]}>
@@ -246,6 +253,33 @@ const StepsDataCard = () => {
 export default function ProfileScreen() {
   const { user, logout } = usePrivy();
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const [username, setUsername] = useState('FitStake User');
+  const [loading, setLoading] = useState(true);
+  const [editUsernameModalVisible, setEditUsernameModalVisible] =
+    useState(false);
+  const [newUsername, setNewUsername] = useState('');
+  const [isUpdatingUsername, setIsUpdatingUsername] = useState(false);
+  const [usernameError, setUsernameError] = useState('');
+
+  useEffect(() => {
+    // Fetch user profile data when component mounts
+    const fetchUserProfile = async () => {
+      try {
+        setLoading(true);
+        const profileData = await authApi.getUserProfile();
+        if (profileData?.data?.username) {
+          setUsername(profileData.data.username);
+        }
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
+        showErrorToast(error, 'Failed to load your profile');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserProfile();
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -253,7 +287,42 @@ export default function ProfileScreen() {
       router.replace('/sign-in');
     } catch (error) {
       console.error('Logout error:', error);
-      Alert.alert('Logout Error', 'Failed to log out. Please try again.');
+      showErrorToast(error, 'Failed to log out');
+    }
+  };
+
+  const openEditUsernameModal = () => {
+    setNewUsername(username);
+    setUsernameError('');
+    setEditUsernameModalVisible(true);
+  };
+
+  const handleUpdateUsername = async () => {
+    // Skip API call if username is unchanged
+    if (newUsername === username) {
+      setEditUsernameModalVisible(false);
+      return;
+    }
+
+    try {
+      setIsUpdatingUsername(true);
+      setUsernameError('');
+
+      const response = await authApi.updateUsername(newUsername);
+
+      if (response?.data?.success) {
+        // Update local state with new username
+        setUsername(response.data.username);
+        setEditUsernameModalVisible(false);
+        showSuccessToast('Username updated successfully');
+      }
+    } catch (error: any) {
+      console.error('Error updating username:', error);
+
+      const errorMessage = handleApiError(error, 'Failed to update username');
+      setUsernameError(errorMessage);
+    } finally {
+      setIsUpdatingUsername(false);
     }
   };
 
@@ -265,24 +334,23 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.profileCard}>
-          {user && <GeneratedAvatar userId={user.id} />}
-          <Text style={styles.name}>FitStake User</Text>
-          <View style={styles.statsRow}>
-            <View style={styles.stat}>
-              <Text style={styles.statValue}>12</Text>
-              <Text style={styles.statLabel}>Challenges</Text>
+          {user && <GeneratedAvatar username={username} />}
+          {loading ? (
+            <ActivityIndicator
+              color={colors.accent.primary}
+              style={styles.profileLoading}
+            />
+          ) : (
+            <View style={styles.usernameContainer}>
+              <Text style={styles.name}>{username}</Text>
+              <Pressable
+                onPress={openEditUsernameModal}
+                style={styles.editButton}
+              >
+                <Edit size={16} color={colors.accent.primary} />
+              </Pressable>
             </View>
-            <View style={styles.statDivider} />
-            <View style={styles.stat}>
-              <Text style={styles.statValue}>8</Text>
-              <Text style={styles.statLabel}>Completed</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.stat}>
-              <Text style={styles.statValue}>45.5</Text>
-              <Text style={styles.statLabel}>SOL Earned</Text>
-            </View>
-          </View>
+          )}
         </View>
 
         {/* Health Connect Steps Data */}
@@ -351,6 +419,51 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Edit Username Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={editUsernameModalVisible}
+        onRequestClose={() => setEditUsernameModalVisible(false)}
+      >
+        <View style={styles.centeredView}>
+          <View style={styles.modalView}>
+            <Text style={styles.modalTitle}>Edit Username</Text>
+            <TextInput
+              style={styles.textInput}
+              value={newUsername}
+              onChangeText={setNewUsername}
+              placeholder="Enter new username"
+              placeholderTextColor={colors.gray[400]}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            {usernameError ? (
+              <Text style={styles.errorText}>{usernameError}</Text>
+            ) : null}
+            <View style={styles.modalButtons}>
+              <Pressable
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setEditUsernameModalVisible(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.modalButton, styles.saveButton]}
+                onPress={handleUpdateUsername}
+                disabled={isUpdatingUsername}
+              >
+                {isUpdatingUsername ? (
+                  <ActivityIndicator size="small" color={colors.white} />
+                ) : (
+                  <Text style={styles.saveButtonText}>Save</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -398,32 +511,15 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xxl,
     fontWeight: fontWeight.bold,
     color: colors.white,
-    marginBottom: spacing.lg,
   },
-  statsRow: {
+  usernameContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    width: '100%',
-    paddingHorizontal: spacing.md,
+    marginBottom: spacing.lg,
   },
-  stat: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: fontSize.xxl,
-    fontWeight: fontWeight.bold,
-    color: colors.white,
-  },
-  statLabel: {
-    fontSize: fontSize.sm,
-    color: colors.gray[300],
-    marginTop: spacing.xs,
-  },
-  statDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: colors.gray[700],
+  editButton: {
+    marginLeft: spacing.sm,
+    padding: spacing.xs,
   },
   section: {
     padding: spacing.md,
@@ -664,6 +760,32 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     color: colors.gray[400],
     marginBottom: spacing.md,
+    textAlign: 'center',
+  },
+  profileLoading: {
+    marginTop: spacing.md,
+  },
+  textInput: {
+    backgroundColor: colors.gray[800],
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    color: colors.white,
+    width: '100%',
+    fontSize: fontSize.md,
+    marginBottom: spacing.md,
+  },
+  errorText: {
+    color: colors.accent.error,
+    fontSize: fontSize.sm,
+    marginBottom: spacing.md,
+    textAlign: 'center',
+  },
+  saveButton: {
+    backgroundColor: colors.accent.primary,
+  },
+  saveButtonText: {
+    color: colors.white,
+    fontWeight: fontWeight.semibold,
     textAlign: 'center',
   },
 });

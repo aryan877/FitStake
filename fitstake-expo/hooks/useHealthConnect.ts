@@ -73,7 +73,7 @@ export const useHealthConnect = () => {
     setError(null);
 
     try {
-      const { aggregateRecord } = await import('react-native-health-connect');
+      const { readRecords } = await import('react-native-health-connect');
       const results: StepsData[] = [];
       const today = new Date();
 
@@ -89,8 +89,8 @@ export const useHealthConnect = () => {
         endDate.setHours(23, 59, 59, 999);
 
         try {
-          const result = await aggregateRecord({
-            recordType: 'Steps',
+          // First read all steps records for the day
+          const stepsResponse = await readRecords('Steps', {
             timeRangeFilter: {
               operator: 'between',
               startTime: startDate.toISOString(),
@@ -98,11 +98,60 @@ export const useHealthConnect = () => {
             },
           });
 
+          // Filter only automatically recorded data (RECORDING_METHOD_AUTOMATICALLY_RECORDED = 2)
+          let totalSteps = 0;
+
+          console.log(
+            `[${displayDate}] Total records: ${
+              stepsResponse?.records?.length || 0
+            }`
+          );
+
+          if (stepsResponse && stepsResponse.records) {
+            // Log the first record to see its structure
+            if (stepsResponse.records.length > 0) {
+              console.log(
+                'Sample record structure:',
+                JSON.stringify(stepsResponse.records[0], null, 2)
+              );
+            }
+
+            // Filter records where recording method is "automatically recorded" (value 2)
+            const automaticRecords = stepsResponse.records.filter(
+              (record) =>
+                record.metadata && record.metadata.recordingMethod === 2
+            );
+
+            console.log(
+              `[${displayDate}] Automatic records: ${automaticRecords.length}`
+            );
+
+            // Sum up the steps from automatically recorded data
+            automaticRecords.forEach((record) => {
+              if (record.count) {
+                totalSteps += record.count;
+              }
+            });
+
+            // Also calculate total for comparison
+            let allStepsTotal = 0;
+            stepsResponse.records.forEach((record) => {
+              if (record.count) {
+                allStepsTotal += record.count;
+              }
+            });
+
+            console.log(
+              `[${displayDate}] Automatic steps: ${totalSteps}, All steps: ${allStepsTotal}`
+            );
+          }
+
           results.push({
             date: displayDate,
-            count: result.COUNT_TOTAL,
+            count: totalSteps,
           });
         } catch (dayErr) {
+          console.error(`Error fetching steps for ${displayDate}:`, dayErr);
           results.push({
             date: displayDate,
             count: 0,
@@ -114,6 +163,7 @@ export const useHealthConnect = () => {
       setLoading(false);
       return results;
     } catch (err) {
+      console.error('Failed to fetch steps data:', err);
       setError('Failed to fetch steps data');
       setLoading(false);
       return [];
