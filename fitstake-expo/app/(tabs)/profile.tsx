@@ -8,7 +8,6 @@ import {
   Footprints,
   LogOut,
   Medal,
-  Settings,
 } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import {
@@ -98,19 +97,46 @@ const StepsDataCard = () => {
     setupHealthConnect,
   } = useHealthConnect();
 
-  useEffect(() => {
-    console.log('StepsDataCard mounted, isAndroid:', isAndroid);
-    console.log('hasPermissions:', hasPermissions);
-    console.log('stepsData:', stepsData);
-    console.log('loading:', loading);
-    console.log('error:', error);
+  const ConnectionComponent = () => {
+    const handleConnect = () => {
+      console.log('Connecting to Health Connect...');
+      setupHealthConnect();
+    };
 
+    return (
+      <View style={styles.stepsCard}>
+        <View style={styles.stepsCardHeader}>
+          <Footprints color={colors.accent.primary} size={24} />
+          <Text style={styles.stepsCardTitle}>Steps Data</Text>
+        </View>
+        <View style={styles.connectionContent}>
+          <View style={styles.connectionAlertContent}>
+            <Text style={styles.connectionAlertTitle}>
+              Connect to Health Connect
+            </Text>
+            <Text style={styles.connectionAlertText}>
+              FitStake needs access to Health Connect to track your steps. Your
+              fitness apps should be synced with Health Connect separately.
+            </Text>
+            <Pressable
+              style={styles.connectionAlertButton}
+              onPress={handleConnect}
+            >
+              <Text style={styles.connectionAlertButtonText}>Connect Now</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
+  useEffect(() => {
     if (isAndroid) {
-      console.log('Manually triggering setupHealthConnect from StepsDataCard');
       setupHealthConnect();
     }
-  }, [isAndroid, hasPermissions, loading, error, setupHealthConnect]);
+  }, [isAndroid, setupHealthConnect]);
 
+  // iOS specific view
   if (!isAndroid) {
     return (
       <View style={styles.stepsCard}>
@@ -118,13 +144,20 @@ const StepsDataCard = () => {
           <Footprints color={colors.accent.primary} size={24} />
           <Text style={styles.stepsCardTitle}>Steps Data</Text>
         </View>
-        <Text style={styles.stepsCardSubtitle}>
-          Health Connect is only available on Android devices.
-        </Text>
+        <View style={styles.emptyStateContainer}>
+          <Text style={styles.stepsCardSubtitle}>Apple Health Integration</Text>
+          <Text style={styles.stepsCardNote}>Coming soon to iOS devices</Text>
+        </View>
       </View>
     );
   }
 
+  // Show connection component if not connected
+  if (!hasPermissions) {
+    return <ConnectionComponent />;
+  }
+
+  // Loading state
   if (loading) {
     return (
       <View style={styles.stepsCard}>
@@ -141,6 +174,7 @@ const StepsDataCard = () => {
     );
   }
 
+  // Error state
   if (error) {
     return (
       <View style={styles.stepsCard}>
@@ -149,36 +183,11 @@ const StepsDataCard = () => {
           <Text style={styles.stepsCardTitle}>Steps Data</Text>
         </View>
         <Text style={styles.stepsCardError}>{error}</Text>
-        <Pressable
-          style={styles.actionButton}
-          onPress={() => refreshStepsData()}
-        >
-          <Text style={styles.actionButtonText}>Retry</Text>
-        </Pressable>
       </View>
     );
   }
 
-  if (!hasPermissions) {
-    return (
-      <View style={styles.stepsCard}>
-        <View style={styles.stepsCardHeader}>
-          <Footprints color={colors.accent.primary} size={24} />
-          <Text style={styles.stepsCardTitle}>Steps Data</Text>
-        </View>
-        <Text style={styles.stepsCardSubtitle}>
-          Permission required to access steps data
-        </Text>
-        <Pressable
-          style={styles.actionButton}
-          onPress={() => refreshStepsData()}
-        >
-          <Text style={styles.actionButtonText}>Grant Permission</Text>
-        </Pressable>
-      </View>
-    );
-  }
-
+  // Connected with data
   return (
     <View style={styles.stepsCard}>
       <View style={styles.stepsCardHeader}>
@@ -190,6 +199,12 @@ const StepsDataCard = () => {
         <View style={styles.emptyStateContainer}>
           <ActivitySquare color={colors.gray[400]} size={40} />
           <Text style={styles.stepsCardSubtitle}>No steps data available</Text>
+          <Pressable
+            style={styles.refreshButton}
+            onPress={() => refreshStepsData()}
+          >
+            <Text style={styles.refreshButtonText}>Refresh Data</Text>
+          </Pressable>
         </View>
       ) : (
         <View>
@@ -290,11 +305,6 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Settings</Text>
           <View style={styles.menuList}>
-            <Pressable style={styles.menuItem}>
-              <Settings size={20} color={colors.white} />
-              <Text style={styles.menuText}>App Settings</Text>
-              <ChevronRight size={20} color={colors.gray[400]} />
-            </Pressable>
             <Pressable
               style={styles.menuItem}
               onPress={() => setLogoutModalVisible(true)}
@@ -608,5 +618,52 @@ const styles = StyleSheet.create({
   },
   loader: {
     marginVertical: spacing.lg,
+  },
+  connectionContent: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  connectionAlertIconContainer: {
+    backgroundColor: colors.gray[700],
+    borderRadius: borderRadius.full,
+    padding: spacing.sm,
+    marginRight: spacing.md,
+  },
+  connectionAlertContent: {
+    flex: 1,
+  },
+  connectionAlertTitle: {
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.bold,
+    color: colors.white,
+    marginBottom: spacing.sm,
+  },
+  connectionAlertText: {
+    fontSize: fontSize.md,
+    color: colors.gray[300],
+    marginBottom: spacing.md,
+  },
+  connectionAlertButton: {
+    backgroundColor: colors.accent.primary,
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+  },
+  connectionAlertButtonText: {
+    color: colors.white,
+    fontWeight: fontWeight.medium,
+  },
+  iosInfoContainer: {
+    marginTop: spacing.md,
+    backgroundColor: colors.gray[800],
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+  },
+  stepsCardNote: {
+    fontSize: fontSize.sm,
+    color: colors.gray[400],
+    marginBottom: spacing.md,
+    textAlign: 'center',
   },
 });
