@@ -229,7 +229,6 @@ export default function RootLayout() {
   }
 
   console.log('isFrameworkReady', isFrameworkReady);
-
   try {
     return (
       <SafeAreaProvider>

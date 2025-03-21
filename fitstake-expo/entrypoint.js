@@ -3,7 +3,6 @@ import { Buffer } from 'buffer';
 global.Buffer = Buffer;
 
 // Import required polyfills in the right order
-import '@ethersproject/shims';
 import 'fast-text-encoding';
 import 'react-native-get-random-values';
 // Import the crypto module from expo-crypto instead of using v4 from uuid
