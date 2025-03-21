@@ -62,11 +62,22 @@ export const formatCountdown = (timestamp: number): string => {
 
 /**
  * Formats a date for display in a readable format
- * @param timestamp Unix timestamp in seconds
+ * @param timestamp Unix timestamp in seconds or milliseconds, or Date object
  * @returns Formatted date string
  */
-export const formatDate = (timestamp: number): string => {
-  return dayjs.unix(timestamp).format('MMM D, YYYY');
+export const formatDate = (timestamp: number | Date): string => {
+  if (timestamp instanceof Date) {
+    // If it's a Date object, convert to unix timestamp in seconds
+    return dayjs(timestamp).format('MMM D, YYYY');
+  }
+
+  // If it's a unix timestamp in seconds (smaller than year 2100)
+  if (timestamp < 4102444800) {
+    return dayjs.unix(timestamp).format('MMM D, YYYY');
+  }
+
+  // Otherwise, assume it's in milliseconds
+  return dayjs(timestamp).format('MMM D, YYYY');
 };
 
 /**

@@ -1,4 +1,5 @@
 import { LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { useRouter } from 'expo-router';
 import { TrendingUp, Trophy, Users } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import {
@@ -30,6 +31,7 @@ const ChallengeCard = ({
   onJoin,
   isJoining,
 }: ChallengeCardProps) => {
+  const router = useRouter();
   // State to hold countdown text
   const [countdownText, setCountdownText] = useState(
     formatCountdown(challenge.endTime)
@@ -38,6 +40,13 @@ const ChallengeCard = ({
   // Calculate if challenge needs more participants
   const needsMoreParticipants =
     challenge.participantCount < challenge.minParticipants;
+
+  // Trim long descriptions
+  const descriptionCharLimit = 120;
+  const trimmedDescription =
+    challenge.description.length > descriptionCharLimit
+      ? `${challenge.description.substring(0, descriptionCharLimit)}...`
+      : challenge.description;
 
   // Update countdown every second
   useEffect(() => {
@@ -49,8 +58,13 @@ const ChallengeCard = ({
     return () => clearInterval(intervalId);
   }, [challenge.endTime]);
 
+  // Handle card press
+  const handleCardPress = () => {
+    router.push(`/challenge/${challenge.id}`);
+  };
+
   return (
-    <View style={styles.challengeCard}>
+    <Pressable style={styles.challengeCard} onPress={handleCardPress}>
       <View style={styles.challengeCardHeader}>
         <Text style={styles.challengeCardTitle}>{challenge.title}</Text>
         {needsMoreParticipants && (
@@ -64,7 +78,7 @@ const ChallengeCard = ({
         )}
       </View>
 
-      <Text style={styles.challengeCardDesc}>{challenge.description}</Text>
+      <Text style={styles.challengeCardDesc}>{trimmedDescription}</Text>
 
       <View style={styles.challengeCardDetails}>
         <View style={styles.detailItem}>
@@ -106,13 +120,16 @@ const ChallengeCard = ({
         ) : (
           <Pressable
             style={styles.joinButton}
-            onPress={() => onJoin(challenge.id)}
+            onPress={(e) => {
+              e.stopPropagation(); // Prevent the card press event
+              onJoin(challenge.id);
+            }}
           >
             <Text style={styles.joinButtonText}>Join</Text>
           </Pressable>
         )}
       </View>
-    </View>
+    </Pressable>
   );
 };
 

@@ -1,5 +1,6 @@
 import { usePrivy } from '@privy-io/expo';
 import { LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { useRouter } from 'expo-router';
 import { Activity, Trophy } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import {
@@ -12,8 +13,8 @@ import {
   Text,
   View,
 } from 'react-native';
-import { challengeApi } from '../../app/services/api';
 import EmptyState from '../components/EmptyState';
+import { challengeApi } from '../services/api';
 import theme from '../theme';
 import { formatCountdown } from '../utils/dateFormatting';
 import { showErrorToast } from '../utils/errorHandling';
@@ -38,6 +39,7 @@ interface UserChallenge {
 
 export default function MyChallengesScreen() {
   const { user } = usePrivy();
+  const router = useRouter();
   const [challenges, setChallenges] = useState<UserChallenge[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -144,8 +146,18 @@ export default function MyChallengesScreen() {
       ? colors.accent.warning
       : colors.accent.primary;
 
+    // Trim long descriptions
+    const descriptionCharLimit = 120;
+    const trimmedDescription =
+      item.description.length > descriptionCharLimit
+        ? `${item.description.substring(0, descriptionCharLimit)}...`
+        : item.description;
+
     return (
-      <View style={styles.challengeCard}>
+      <Pressable
+        style={styles.challengeCard}
+        onPress={() => router.push(`/challenge/${item.id}`)}
+      >
         <View style={styles.challengeHeader}>
           <Text style={styles.challengeTitle}>{item.title}</Text>
           <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
@@ -153,7 +165,7 @@ export default function MyChallengesScreen() {
           </View>
         </View>
 
-        <Text style={styles.challengeDescription}>{item.description}</Text>
+        <Text style={styles.challengeDescription}>{trimmedDescription}</Text>
 
         <View style={styles.progressSection}>
           <Text style={styles.progressText}>
@@ -190,7 +202,7 @@ export default function MyChallengesScreen() {
             {formatCountdown(item.endTime)}
           </Text>
         </View>
-      </View>
+      </Pressable>
     );
   };
 

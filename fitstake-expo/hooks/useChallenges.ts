@@ -415,50 +415,24 @@ export const useChallenges = () => {
         // Update the backend
         const response = await challengeApi.joinChallenge(challengeId);
 
-        // Update challenges list locally instead of reloading everything
-        setChallenges((currentChallenges) => {
-          return currentChallenges.map((c) => {
-            if (c.id === challengeId) {
-              // Create updated challenge with new participant and counts
-              return {
-                ...c,
-                participantCount: c.participantCount + 1,
-                totalStake: c.totalStake + c.stakeAmount,
-                participants: [
-                  ...c.participants,
-                  {
-                    walletAddress,
-                    stakeAmount: c.stakeAmount,
-                    completed: false,
-                    claimed: false,
-                    joinedAt: new Date(),
-                  },
-                ],
-                isActive: c.participantCount + 1 >= c.minParticipants,
-              };
-            }
-            return c;
-          });
-        });
+        if (!response.success) {
+          throw new Error('Failed to update backend after joining challenge');
+        }
 
-        return response.success;
+        return true;
       } catch (err: any) {
         console.error('Error joining challenge:', err);
         setError(`Failed to join challenge: ${err.message || 'Unknown error'}`);
         return false;
       }
     },
-    [
-      authenticated,
-      walletAddress,
-      getAnchorProgram,
-      sendTransaction,
-      // Remove fetchChallenges from dependencies
-    ]
+    [authenticated, walletAddress, getAnchorProgram, sendTransaction]
   );
 
   /**
    * Fetches a single challenge by ID
+   * Note: This function doesn't update the challenges state,
+   * it just returns the challenge data for standalone use in detail pages
    */
   const fetchChallengeById = useCallback(async (challengeId: string) => {
     setLoading(true);

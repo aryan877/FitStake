@@ -13,6 +13,10 @@ import theme from '../theme';
 
 const { colors, spacing, borderRadius, fontSize, fontWeight } = theme;
 
+// Define maximum character limits
+const MAX_TITLE_LENGTH = 50;
+const MAX_DESCRIPTION_LENGTH = 250;
+
 interface CreateChallengeModalProps {
   visible: boolean;
   onClose: () => void;
@@ -50,25 +54,37 @@ const CreateChallengeModal = ({
           <Text style={styles.modalTitle}>Create New Challenge</Text>
 
           <ScrollView style={styles.modalForm}>
-            <Text style={styles.inputLabel}>Title</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Challenge title"
-              placeholderTextColor={colors.gray[500]}
-              value={challenge.title}
-              onChangeText={(text) => onChange('title', text)}
-            />
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Title</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Challenge title"
+                placeholderTextColor={colors.gray[500]}
+                value={challenge.title}
+                maxLength={MAX_TITLE_LENGTH}
+                onChangeText={(text) => onChange('title', text)}
+              />
+              <Text style={styles.characterCount}>
+                {challenge.title.length}/{MAX_TITLE_LENGTH}
+              </Text>
+            </View>
 
-            <Text style={styles.inputLabel}>Description</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Describe your challenge"
-              placeholderTextColor={colors.gray[500]}
-              multiline
-              numberOfLines={4}
-              value={challenge.description}
-              onChangeText={(text) => onChange('description', text)}
-            />
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Description</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                placeholder="Describe your challenge"
+                placeholderTextColor={colors.gray[500]}
+                multiline
+                numberOfLines={4}
+                maxLength={MAX_DESCRIPTION_LENGTH}
+                value={challenge.description}
+                onChangeText={(text) => onChange('description', text)}
+              />
+              <Text style={styles.characterCount}>
+                {challenge.description.length}/{MAX_DESCRIPTION_LENGTH}
+              </Text>
+            </View>
 
             <Text style={styles.inputLabel}>Stake Amount (SOL)</Text>
             <TextInput
@@ -201,6 +217,9 @@ const styles = StyleSheet.create({
     maxHeight: 500,
     marginBottom: spacing.md,
   },
+  inputContainer: {
+    marginBottom: spacing.md,
+  },
   inputLabel: {
     fontSize: fontSize.sm,
     fontWeight: fontWeight.medium,
@@ -214,7 +233,13 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     fontSize: fontSize.md,
     color: colors.white,
-    marginBottom: spacing.md,
+    marginBottom: spacing.xs,
+  },
+  characterCount: {
+    fontSize: fontSize.xs,
+    color: colors.gray[400],
+    textAlign: 'right',
+    marginTop: 2,
   },
   textArea: {
     height: 100,

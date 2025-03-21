@@ -253,6 +253,28 @@ export const createChallenge = async (
       return next(new ApiError(400, "Missing required fields"));
     }
 
+    // Validate title and description length
+    const MAX_TITLE_LENGTH = 50;
+    const MAX_DESCRIPTION_LENGTH = 250;
+
+    if (title.length > MAX_TITLE_LENGTH) {
+      return next(
+        new ApiError(
+          400,
+          `Title must be ${MAX_TITLE_LENGTH} characters or less`
+        )
+      );
+    }
+
+    if (description.length > MAX_DESCRIPTION_LENGTH) {
+      return next(
+        new ApiError(
+          400,
+          `Description must be ${MAX_DESCRIPTION_LENGTH} characters or less`
+        )
+      );
+    }
+
     // Verify user has wallet address
     const user = await UserModel.findOne({ privyId: did });
     if (!user || !user.walletAddress) {

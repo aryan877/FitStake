@@ -32,7 +32,7 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="progress"
+        name="challenges"
         options={{
           title: 'My Challenges',
           tabBarIcon: ({ color, size }: TabBarIconProps) => (

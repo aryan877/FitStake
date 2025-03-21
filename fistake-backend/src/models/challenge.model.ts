@@ -93,10 +93,12 @@ const ChallengeSchema: Schema = new Schema(
       type: String,
       required: true,
       trim: true,
+      maxlength: 50, // Max title length
     },
     description: {
       type: String,
       required: true,
+      maxlength: 250, // Max description length
     },
     type: {
       type: String,
