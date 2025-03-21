@@ -9,6 +9,7 @@ import morgan from "morgan";
 import { errorHandler, notFound } from "./middleware/error.middleware";
 import authRoutes from "./routes/auth.routes";
 import challengeRoutes from "./routes/challenge.routes";
+import healthRoutes from "./routes/health.routes";
 
 dotenv.config();
 
@@ -29,6 +30,7 @@ app.use(morgan("dev"));
 // Routes
 app.use("/api/challenges", challengeRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/health", healthRoutes);
 
 // Health check route
 app.get("/health", (req, res) => {

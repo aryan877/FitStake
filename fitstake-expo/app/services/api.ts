@@ -1,5 +1,11 @@
 import { getAccessToken } from '@privy-io/expo';
+import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 import axios from 'axios';
+
+export interface StepsData {
+  count: number;
+  date: string;
+}
 
 // Get backend URL from environment variables
 const BACKEND_URL =
@@ -94,10 +100,51 @@ export const challengeApi = {
       limit?: number;
       type?: string;
       status?: string;
+      minStake?: number;
+      maxStake?: number;
+      minGoal?: number;
+      maxGoal?: number;
+      minParticipants?: number;
+      maxParticipants?: number;
+      sortBy?: string;
+      sortOrder?: 'asc' | 'desc';
     } = {}
   ) => {
     try {
-      const response = await api.get('/challenges', { params });
+      const cleanParams: Record<string, any> = {};
+
+      // Copy string/simple params directly
+      ['page', 'limit', 'type', 'status', 'sortBy', 'sortOrder'].forEach(
+        (key) => {
+          if (params[key as keyof typeof params] !== undefined) {
+            cleanParams[key] = params[key as keyof typeof params];
+          }
+        }
+      );
+
+      // Handle SOL to lamports conversion
+      ['minStake', 'maxStake'].forEach((key) => {
+        const value = params[key as keyof typeof params];
+        if (value !== undefined) {
+          const numValue = Number(value);
+          if (!isNaN(numValue)) {
+            cleanParams[key] = Math.floor(numValue * LAMPORTS_PER_SOL);
+          }
+        }
+      });
+
+      // Handle numeric values
+      ['minGoal', 'maxGoal', 'minParticipants', 'maxParticipants'].forEach(
+        (key) => {
+          const value = params[key as keyof typeof params];
+          if (value !== undefined && !isNaN(Number(value))) {
+            cleanParams[key] = Number(value);
+          }
+        }
+      );
+
+      console.log('Clean params sent to server:', cleanParams);
+      const response = await api.get('/challenges', { params: cleanParams });
       return response.data;
     } catch (error) {
       throw error;
@@ -124,7 +171,21 @@ export const challengeApi = {
     } = {}
   ) => {
     try {
-      const response = await api.get('/challenges/user/challenges', { params });
+      // Create a clean copy of params
+      const cleanParams: Record<string, any> = {};
+
+      // Handle pagination and text params
+      if (params.page !== undefined) cleanParams.page = params.page;
+      if (params.limit !== undefined) cleanParams.limit = params.limit;
+      if (params.status !== undefined) cleanParams.status = params.status;
+
+      console.log(
+        'Clean params sent to server for user challenges:',
+        cleanParams
+      );
+      const response = await api.get('/challenges/user/challenges', {
+        params: cleanParams,
+      });
       return response.data;
     } catch (error) {
       console.error('Error fetching user challenges:', error);
@@ -132,15 +193,8 @@ export const challengeApi = {
     }
   },
 
-  // Create a new challenge
-  create: async (data: {
-    title: string;
-    description: string;
-    type: 'STEPS' | 'WORKOUT' | 'SLEEP' | 'CUSTOM';
-    goal: { value: number; unit: string };
-    duration: { days: number; startDate?: Date; endDate?: Date };
-    stake: { amount: number; token: string };
-  }) => {
+  // Create a new challenge from smart contract data
+  createChallenge: async (data: any) => {
     try {
       const response = await api.post('/challenges', data);
       return response.data;
@@ -151,7 +205,7 @@ export const challengeApi = {
   },
 
   // Join a challenge
-  join: async (id: string) => {
+  joinChallenge: async (id: string) => {
     try {
       const response = await api.post(`/challenges/${id}/join`);
       return response.data;
@@ -161,16 +215,45 @@ export const challengeApi = {
     }
   },
 
-  // Update challenge status (complete, fail)
-  updateStatus: async (
+  // Submit health data for a challenge
+  submitHealthData: async (
     id: string,
-    status: 'ACTIVE' | 'COMPLETED' | 'FAILED'
+    data: {
+      healthData: StepsData[];
+      progress: number;
+      isCompleted: boolean;
+    }
   ) => {
     try {
-      const response = await api.patch(`/challenges/${id}/status`, { status });
+      const response = await api.post(
+        `/health/challenges/${id}/health-data`,
+        data
+      );
       return response.data;
     } catch (error) {
-      console.error(`Error updating challenge ${id} status:`, error);
+      console.error(`Error submitting health data for challenge ${id}:`, error);
+      throw error;
+    }
+  },
+
+  // Get current progress for a challenge
+  getProgress: async (id: string) => {
+    try {
+      const response = await api.get(`/health/challenges/${id}/progress`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error getting progress for challenge ${id}:`, error);
+      throw error;
+    }
+  },
+
+  // Force sync health data for all user's active challenges
+  syncAllChallenges: async () => {
+    try {
+      const response = await api.post('/health/challenges/sync-health-data');
+      return response.data;
+    } catch (error) {
+      console.error('Error syncing health data for challenges:', error);
       throw error;
     }
   },

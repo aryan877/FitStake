@@ -1,24 +1,17 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
 // This is the program ID that uniquely identifies this Solana program on the blockchain
-declare_id!("5F5w53HrCTKDarUUSrRWNppMxJiM2LYGLCuJhtAoGcbj"); 
+declare_id!("Aky9S499wn2Je1h6DAkV3JWqszYK8LHa2uJkCjwHJnnQ"); 
 
 /* 
  * FitStake Accountability Smart Contract
  * 
- * This contract allows users to create fitness challenges, stake tokens (SOL, USDC, or any SPL token),
+ * This contract allows users to create fitness challenges, stake SOL,
  * and earn rewards for completing challenges. The contract supports:
  * - Creating challenges with customizable parameters
- * - Joining challenges by staking tokens
+ * - Joining challenges by staking SOL
  * - Automated verification of challenge completion by trusted backend
  * - Distributing rewards to successful participants
- *
- * Tokens: This contract works with any SPL token (Solana's token standard).
- * Common tokens include:
- * - USDC (a stablecoin pegged to USD)
- * - SOL (native Solana token)
- * - Custom SPL tokens
  */
 
 #[program]
@@ -26,11 +19,10 @@ pub mod accountability {
     use super::*;
 
     // Initialize a new challenge with specified parameters
-    // This function creates the foundation for a fitness challenge
     pub fn create_challenge(
         ctx: Context<CreateChallenge>,
         challenge_id: String,          // Unique identifier for the challenge
-        stake_amount: u64,             // Amount each participant must stake (in token lamports/smallest units)
+        stake_amount: u64,             // Amount each participant must stake (in lamports)
         start_time: i64,               // Unix timestamp when challenge starts
         end_time: i64,                 // Unix timestamp when challenge ends
         min_participants: u8,          // Minimum participants required to activate challenge
@@ -55,8 +47,7 @@ pub mod accountability {
         Ok(())
     }
 
-    // Join a challenge by staking tokens
-    // Participants lock their tokens in the challenge vault
+    // Join a challenge by staking SOL
     pub fn join_challenge(ctx: Context<JoinChallenge>) -> Result<()> {
         let challenge = &mut ctx.accounts.challenge;
         let participant = &mut ctx.accounts.participant;
@@ -73,16 +64,16 @@ pub mod accountability {
             AccountingError::MaxParticipantsReached
         );
 
-        // Transfer stake tokens from participant's wallet to challenge vault
-        // This locks the participant's tokens in the challenge
-        let cpi_accounts = Transfer {
-            from: ctx.accounts.participant_token_account.to_account_info(),
-            to: ctx.accounts.vault.to_account_info(),
-            authority: ctx.accounts.participant_authority.to_account_info(),
-        };
-        let cpi_program = ctx.accounts.token_program.to_account_info();
-        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
-        token::transfer(cpi_ctx, challenge.stake_amount)?;
+        // Transfer SOL from participant's wallet to vault PDA
+        let amount = challenge.stake_amount;
+        let cpi_context = CpiContext::new(
+            ctx.accounts.system_program.to_account_info(),
+            anchor_lang::system_program::Transfer {
+                from: ctx.accounts.participant_authority.to_account_info(),
+                to: ctx.accounts.vault.to_account_info(),
+            },
+        );
+        anchor_lang::system_program::transfer(cpi_context, amount)?;
 
         // Record participant information
         participant.authority = ctx.accounts.participant_authority.key();
@@ -104,7 +95,6 @@ pub mod accountability {
     }
     
     // Admin completes challenges for multiple participants at once
-    // This allows for automated off-chain verification by trusted backend
     pub fn admin_complete_challenges(
         ctx: Context<AdminCompleteChallenge>,
         participant_wallets: Vec<Pubkey>  // List of participant wallet addresses to mark as completed
@@ -122,16 +112,15 @@ pub mod accountability {
         require!(!challenge.is_completed, AccountingError::ChallengeCompleted);
         
         // Store the participant wallets in the challenge's completed list
-        // The actual participants will be marked as completed when they claim rewards
-        ctx.accounts.completed_list.wallets = participant_wallets;
-        ctx.accounts.completed_list.challenge = challenge.key();
-        ctx.accounts.completed_list.is_processed = false;
+        let completed_list = &mut ctx.accounts.completed_list;
+        completed_list.wallets = participant_wallets;
+        completed_list.challenge = challenge.key();
+        completed_list.is_processed = false;
         
         Ok(())
     }
 
     // Mark challenge as completed by admin
-    // This allows admin to finalize a challenge after the end time
     pub fn finalize_challenge(ctx: Context<FinalizeChallenge>) -> Result<()> {
         let challenge = &mut ctx.accounts.challenge;
         
@@ -158,7 +147,6 @@ pub mod accountability {
     }
 
     // Distribute rewards to winners who completed the challenge
-    // Winners can claim their original stake plus a share of failed participants' stakes
     pub fn claim_reward(ctx: Context<ClaimReward>) -> Result<()> {
         let challenge = &ctx.accounts.challenge;
         let participant = &mut ctx.accounts.participant;
@@ -183,23 +171,25 @@ pub mod accountability {
             participant.stake_amount,
         );
 
-        // Transfer reward from challenge vault to participant's wallet
-        // This uses Program Derived Address (PDA) to sign on behalf of the vault
+        // Transfer SOL from vault to participant
+        // Using bump seeds to authorize the PDA to sign
+        let vault_bump = *ctx.bumps.get("vault").unwrap();
         let challenge_key = challenge.key();
-        let seeds = &[
-            b"vault", 
-            challenge_key.as_ref(),
-            &[ctx.bumps.get("vault").unwrap().clone()]
-        ];
+        let seeds = &[b"vault", challenge_key.as_ref(), &[vault_bump]];
         let signer = &[&seeds[..]];
-        let cpi_accounts = Transfer {
-            from: ctx.accounts.vault.to_account_info(),
-            to: ctx.accounts.participant_token_account.to_account_info(),
-            authority: ctx.accounts.vault.to_account_info(),
-        };
-        let cpi_program = ctx.accounts.token_program.to_account_info();
-        let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer);
-        token::transfer(cpi_ctx, reward_amount)?;
+
+        // Create the CPI context with signer seeds
+        let cpi_context = CpiContext::new_with_signer(
+            ctx.accounts.system_program.to_account_info(),
+            anchor_lang::system_program::Transfer {
+                from: ctx.accounts.vault.to_account_info(),
+                to: ctx.accounts.participant_authority.to_account_info(),
+            },
+            signer,
+        );
+        
+        // Perform the transfer
+        anchor_lang::system_program::transfer(cpi_context, reward_amount)?;
 
         // Mark participant as having claimed their reward
         participant.claimed = true;
@@ -216,7 +206,6 @@ pub mod accountability {
 #[instruction(challenge_id: String)]
 pub struct CreateChallenge<'info> {
     // Challenge account - stores all challenge data
-    // Created using a PDA derived from "challenge" and the challenge_id
     #[account(
         init,
         payer = authority,
@@ -242,7 +231,6 @@ pub struct JoinChallenge<'info> {
     pub challenge: Account<'info, Challenge>,
     
     // Participant account - stores participant's challenge data
-    // Created using a PDA derived from "participant", challenge key, and participant's wallet
     #[account(
         init,
         payer = participant_authority,
@@ -252,27 +240,20 @@ pub struct JoinChallenge<'info> {
     )]
     pub participant: Account<'info, Participant>,
     
-    // Participant's token account that holds the tokens they'll stake
-    #[account(mut)]
-    pub participant_token_account: Account<'info, TokenAccount>,
-    
-    // Vault account that holds staked tokens for this challenge
-    // Created using a PDA derived from "vault" and challenge key
+    // Vault account that holds staked SOL for this challenge (PDA)
     #[account(
         mut,
         seeds = [b"vault", challenge.key().as_ref()],
         bump
     )]
-    pub vault: Account<'info, TokenAccount>,
+    /// CHECK: This is a PDA that acts as a SOL vault
+    pub vault: UncheckedAccount<'info>,
     
     // Participant's wallet that signs the transaction and pays for account creation
     #[account(mut)]
     pub participant_authority: Signer<'info>,
     
-    // Required for token transfers on Solana
-    pub token_program: Program<'info, Token>,
-    
-    // Required for creating new accounts on Solana
+    // Required for SOL transfers on Solana
     pub system_program: Program<'info, System>,
 }
 
@@ -285,7 +266,7 @@ pub struct AdminCompleteChallenge<'info> {
     
     // CompletedList account - stores list of completed participants
     #[account(
-        init_if_needed,
+        init,
         payer = admin,
         space = 8 + 32 + 4 + (32 * 256) + 1, // discriminator + challenge pubkey + vec len + max 256 pubkeys + bool
         seeds = [b"completed_list", challenge.key().as_ref()],
@@ -334,24 +315,21 @@ pub struct ClaimReward<'info> {
     )]
     pub completed_list: Account<'info, CompletedList>,
     
-    // Participant's token account that will receive the rewards
-    #[account(mut)]
-    pub participant_token_account: Account<'info, TokenAccount>,
-    
-    // Vault account that holds the staked tokens and will send rewards
+    // Vault account that holds the staked SOL and will send rewards
     #[account(
         mut,
         seeds = [b"vault", challenge.key().as_ref()],
         bump,
     )]
-    pub vault: Account<'info, TokenAccount>,
+    /// CHECK: This is a PDA that acts as a SOL vault
+    pub vault: UncheckedAccount<'info>,
     
-    // Participant's wallet that signs the transaction
+    // Participant's wallet that signs the transaction and receives rewards
     #[account(mut)]
     pub participant_authority: Signer<'info>,
     
-    // Required for token transfers on Solana
-    pub token_program: Program<'info, Token>,
+    // Required for SOL transfers on Solana
+    pub system_program: Program<'info, System>,
 }
 
 // Challenge data structure
@@ -360,13 +338,13 @@ pub struct Challenge {
     pub authority: Pubkey,          // Creator of the challenge
     pub admin: Pubkey,              // Admin with special privileges for this challenge
     pub challenge_id: String,       // Unique identifier
-    pub stake_amount: u64,          // Amount each participant must stake (in token lamports)
+    pub stake_amount: u64,          // Amount each participant must stake (in lamports)
     pub start_time: i64,            // Challenge start timestamp
     pub end_time: i64,              // Challenge end timestamp
     pub min_participants: u8,       // Minimum participants needed to activate
     pub max_participants: u8,       // Maximum allowed participants
     pub participant_count: u8,      // Current number of participants
-    pub total_stake: u64,           // Total tokens staked in the challenge
+    pub total_stake: u64,           // Total SOL staked in the challenge
     pub is_active: bool,            // Whether challenge is active
     pub is_completed: bool,         // Whether challenge is completed
 }
@@ -394,7 +372,7 @@ impl Challenge {
     pub const LEN: usize = 8 +      // Account discriminator
         32 +                        // authority: Pubkey
         32 +                        // admin: Pubkey
-        32 +                        // challenge_id: String (max length)
+        4 + 100 +                   // challenge_id: String (4 bytes for length + max 100 chars)
         8 +                         // stake_amount: u64
         8 +                         // start_time: i64
         8 +                         // end_time: i64
@@ -440,9 +418,10 @@ pub enum AccountingError {
 
 // Calculate reward distribution
 // This simple implementation divides the total stake equally among all participants
-// More complex reward algorithms could be implemented here
-fn calculate_reward(_total_stake: u64, completed_count: u8, _stake_amount: u64) -> u64 {
+fn calculate_reward(total_stake: u64, completed_count: u8, _stake_amount: u64) -> u64 {
+    if completed_count == 0 {
+        return 0;
+    }
     // Winners split the pool equally
-    // For more sophisticated reward structures, this function could be modified
-    _total_stake / completed_count as u64
+    total_stake / completed_count as u64
 }

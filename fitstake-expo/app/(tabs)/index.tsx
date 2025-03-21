@@ -1,6 +1,6 @@
 import { usePrivy } from '@privy-io/expo';
-import { LinearGradient } from 'expo-linear-gradient';
-import { TrendingUp, Trophy, Users } from 'lucide-react-native';
+import { LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { Plus, Sliders, Trophy } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -12,71 +12,54 @@ import {
   Text,
   View,
 } from 'react-native';
-import { challengeApi } from '../services/api';
+import { ChallengeFilters, useChallenges } from '../../hooks/useChallenges';
+import { useSolanaWallet } from '../../hooks/useSolanaWallet';
+import ActiveFilters from '../components/ActiveFilters';
+import ChallengeCard from '../components/ChallengeCard';
+import CreateChallengeModal from '../components/CreateChallengeModal';
+import EmptyState from '../components/EmptyState';
+import FilterButton from '../components/FilterButton';
+import FilterModal from '../components/FilterModal';
 import theme from '../theme';
 import { showErrorToast, showSuccessToast } from '../utils/errorHandling';
 
 const { colors, spacing, borderRadius, fontSize, fontWeight, shadows } = theme;
 
-interface ChallengeData {
-  id: string;
-  title: string;
-  description: string;
-  type: 'STEPS' | 'WORKOUT' | 'SLEEP' | 'CUSTOM';
-  goal: {
-    value: number;
-    unit: string;
-  };
-  duration: {
-    days: number;
-    startDate?: string;
-    endDate?: string;
-  };
-  stake: {
-    amount: number;
-    token: string;
-  };
-  participants: {
-    did: string;
-    status: 'ACTIVE' | 'COMPLETED' | 'FAILED';
-    joinedAt: string;
-  }[];
-  isActive: boolean;
-  createdBy: string;
-  poolAmount: number;
-  totalParticipants: number;
-  successRate?: number;
-}
-
 export default function ChallengesScreen() {
   const { user } = usePrivy();
-  const [challenges, setChallenges] = useState<ChallengeData[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { address: walletAddress, balance } = useSolanaWallet();
+  const {
+    challenges,
+    loading,
+    error,
+    fetchChallenges,
+    joinChallenge,
+    createChallenge,
+    filterParams,
+    updateFilters,
+  } = useChallenges();
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchChallenges = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await challengeApi.getAll();
-
-      // Handle the new API response format
-      if (response.success && response.data && response.data.challenges) {
-        setChallenges(response.data.challenges);
-      } else {
-        // If we don't have challenges array, set empty array
-        setChallenges([]);
-      }
-    } catch (err) {
-      console.error('Error fetching challenges:', err);
-      setError('Failed to load challenges. Please try again later.');
-      showErrorToast(err, 'Failed to load challenges');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+  const [createModalVisible, setCreateModalVisible] = useState(false);
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [newChallenge, setNewChallenge] = useState({
+    title: '',
+    description: '',
+    stakeAmount: '0.1',
+    goalSteps: '10000',
+    durationDays: '1',
+    minParticipants: '2',
+    maxParticipants: '10',
+  });
+  const [filters, setFilters] = useState<ChallengeFilters>({
+    status: 'active',
+    sortBy: 'createdAt',
+    sortOrder: 'desc',
+  });
+  const [isCreating, setIsCreating] = useState(false);
+  const [joiningChallengeId, setJoiningChallengeId] = useState<string | null>(
+    null
+  );
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   const handleJoinChallenge = async (challengeId: string) => {
     try {
@@ -88,27 +71,252 @@ export default function ChallengesScreen() {
         return;
       }
 
-      const response = await challengeApi.join(challengeId);
-      if (response.success) {
-        fetchChallenges();
+      if (!walletAddress) {
+        Alert.alert(
+          'Wallet Required',
+          'Your wallet address is not available. Please check your connection.'
+        );
+        return;
+      }
+
+      setJoiningChallengeId(challengeId);
+
+      // Find the challenge to get its stake amount
+      const challenge = challenges.find((c) => c.id === challengeId);
+      if (!challenge) {
+        showErrorToast(
+          new Error('Challenge not found'),
+          'Failed to join the challenge'
+        );
+        setJoiningChallengeId(null);
+        return;
+      }
+
+      // Check if user is already a participant
+      const isAlreadyParticipant = challenge.participants.some(
+        (p) => p.walletAddress === walletAddress
+      );
+
+      if (isAlreadyParticipant) {
+        showErrorToast(
+          new Error('Already joined'),
+          'You are already a participant in this challenge'
+        );
+        setJoiningChallengeId(null);
+        return;
+      }
+
+      // Check if user has sufficient balance
+      const requiredBalance = challenge.stakeAmount / LAMPORTS_PER_SOL;
+      if (balance !== null && balance < requiredBalance) {
+        Alert.alert(
+          'Insufficient Balance',
+          `You need at least ${requiredBalance} SOL to join this challenge. Your balance: ${balance.toFixed(
+            4
+          )} SOL.`
+        );
+        setJoiningChallengeId(null);
+        return;
+      }
+
+      const success = await joinChallenge(challengeId);
+      if (success) {
         showSuccessToast('You have successfully joined the challenge!');
       }
     } catch (err) {
       console.error('Error joining challenge:', err);
       showErrorToast(err, 'Failed to join the challenge');
+    } finally {
+      setJoiningChallengeId(null);
     }
   };
 
-  const onRefresh = () => {
+  const handleCreateChallenge = async () => {
+    if (!user || !walletAddress) {
+      Alert.alert(
+        'Authentication Required',
+        'Please log in to create a challenge.'
+      );
+      return;
+    }
+
+    // Validate inputs
+    if (!newChallenge.title.trim()) {
+      Alert.alert('Missing Title', 'Please enter a title for your challenge.');
+      return;
+    }
+
+    if (!newChallenge.description.trim()) {
+      Alert.alert(
+        'Missing Description',
+        'Please provide a description for your challenge.'
+      );
+      return;
+    }
+
+    const stakeAmount = parseFloat(newChallenge.stakeAmount);
+    if (isNaN(stakeAmount) || stakeAmount <= 0) {
+      Alert.alert(
+        'Invalid Stake Amount',
+        'Please enter a valid stake amount greater than 0.'
+      );
+      return;
+    }
+
+    const goalSteps = parseInt(newChallenge.goalSteps);
+    if (isNaN(goalSteps) || goalSteps <= 0) {
+      Alert.alert(
+        'Invalid Goal',
+        'Please enter a valid step goal greater than 0.'
+      );
+      return;
+    }
+
+    const durationDays = parseInt(newChallenge.durationDays);
+    if (isNaN(durationDays) || durationDays <= 0) {
+      Alert.alert(
+        'Invalid Duration',
+        'Please enter a valid duration in days greater than 0.'
+      );
+      return;
+    }
+
+    const minParticipants = parseInt(newChallenge.minParticipants);
+    if (isNaN(minParticipants) || minParticipants < 2) {
+      Alert.alert(
+        'Invalid Min Participants',
+        'Please enter at least 2 minimum participants.'
+      );
+      return;
+    }
+
+    const maxParticipants = parseInt(newChallenge.maxParticipants);
+    if (isNaN(maxParticipants) || maxParticipants < minParticipants) {
+      Alert.alert(
+        'Invalid Max Participants',
+        'Max participants must be at least equal to min participants.'
+      );
+      return;
+    }
+
+    // Check if user has sufficient balance to create challenge
+    if (balance !== null && balance < stakeAmount) {
+      Alert.alert(
+        'Insufficient Balance',
+        `You need at least ${stakeAmount} SOL to create this challenge. Your balance: ${balance.toFixed(
+          4
+        )} SOL.`
+      );
+      return;
+    }
+
+    setIsCreating(true);
+
+    try {
+      const now = Math.floor(Date.now() / 1000);
+      const endTime = now + durationDays * 24 * 60 * 60; // Convert days to seconds
+
+      const challengeParams = {
+        title: newChallenge.title,
+        description: newChallenge.description,
+        stakeAmount: Math.floor(stakeAmount * LAMPORTS_PER_SOL), // Convert SOL to lamports
+        startTime: now,
+        endTime: endTime,
+        minParticipants: minParticipants,
+        maxParticipants: maxParticipants,
+        goalSteps: goalSteps,
+      };
+
+      const result = await createChallenge(challengeParams);
+
+      if (result) {
+        showSuccessToast('Challenge created successfully!');
+        setCreateModalVisible(false);
+        // Reset form
+        setNewChallenge({
+          title: '',
+          description: '',
+          stakeAmount: '0.1',
+          goalSteps: '10000',
+          durationDays: '1',
+          minParticipants: '2',
+          maxParticipants: '10',
+        });
+        // Refresh challenges list
+        fetchChallenges();
+      } else {
+        Alert.alert('Failed to create challenge', 'Please try again later.');
+      }
+    } catch (err) {
+      console.error('Error creating challenge:', err);
+      showErrorToast(err, 'Failed to create challenge');
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleApplyFilters = async () => {
+    try {
+      await updateFilters(filters);
+      setFilterModalVisible(false);
+    } catch (err) {
+      console.error('Error applying filters:', err);
+      showErrorToast(err, 'Failed to apply filters');
+    }
+  };
+
+  const handleChallengeFormChange = (field: string, value: string) => {
+    setNewChallenge((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const clearFilters = async () => {
+    const defaultFilters: ChallengeFilters = {
+      status: 'active',
+      sortBy: 'createdAt',
+      sortOrder: 'desc',
+      minStake: undefined,
+      maxStake: undefined,
+      minGoal: undefined,
+      maxGoal: undefined,
+      minParticipants: undefined,
+      maxParticipants: undefined,
+    };
+
+    setFilters(defaultFilters);
+    await updateFilters(defaultFilters);
+    setFilterModalVisible(false);
+  };
+
+  const onRefresh = async () => {
     setRefreshing(true);
-    fetchChallenges();
+    try {
+      await fetchChallenges();
+    } catch (err) {
+      console.error('Error refreshing challenges:', err);
+      showErrorToast(err, 'Failed to refresh challenges');
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   useEffect(() => {
-    fetchChallenges();
-  }, []);
+    const loadInitialData = async () => {
+      try {
+        await fetchChallenges();
+      } catch (err) {
+        console.error('Error loading initial data:', err);
+      } finally {
+        setIsInitialLoad(false);
+      }
+    };
 
-  if (loading && !refreshing) {
+    loadInitialData();
+  }, [fetchChallenges]);
+
+  if ((loading && !refreshing && !isCreating) || isInitialLoad) {
     return (
       <View style={[styles.container, styles.centered]}>
         <ActivityIndicator size="large" color={colors.accent.primary} />
@@ -116,9 +324,6 @@ export default function ChallengesScreen() {
       </View>
     );
   }
-
-  // Featured challenge is the first active challenge or null if none exist
-  const featuredChallenge = challenges.length > 0 ? challenges[0] : null;
 
   return (
     <View style={styles.container}>
@@ -130,13 +335,34 @@ export default function ChallengesScreen() {
             onRefresh={onRefresh}
             colors={[colors.accent.primary]}
             tintColor={colors.accent.primary}
+            progressBackgroundColor={colors.gray[800]}
+            progressViewOffset={10}
           />
         }
       >
         <View style={styles.header}>
-          <Text style={styles.title}>Active Challenges</Text>
-          <Text style={styles.subtitle}>Join a challenge and earn rewards</Text>
+          <Text style={styles.title}>Challenges</Text>
+          <Text style={styles.subtitle}>
+            Join fitness challenges and earn rewards
+          </Text>
         </View>
+
+        <View style={styles.actionButtonsContainer}>
+          <FilterButton
+            icon={<Sliders size={16} color={colors.white} />}
+            text="Filter"
+            onPress={() => setFilterModalVisible(true)}
+          />
+
+          <FilterButton
+            icon={<Plus size={16} color={colors.white} />}
+            text="Create Challenge"
+            primary
+            onPress={() => setCreateModalVisible(true)}
+          />
+        </View>
+
+        <ActiveFilters filters={filters} onClearFilters={clearFilters} />
 
         {error ? (
           <View style={styles.errorContainer}>
@@ -146,81 +372,53 @@ export default function ChallengesScreen() {
             </Pressable>
           </View>
         ) : challenges.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Trophy color={colors.gray[400]} size={48} />
-            <Text style={styles.emptyText}>No active challenges found</Text>
-          </View>
+          <EmptyState
+            icon={<Trophy color={colors.gray[400]} size={48} />}
+            title="No challenges found"
+            subtitle="Try adjusting your filters or create a new challenge"
+          />
         ) : (
-          <>
-            {featuredChallenge && (
-              <View style={styles.featuredChallenge}>
-                <LinearGradient
-                  colors={[colors.accent.primary, '#FF7043']}
-                  style={styles.gradientBg}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                >
-                  <View style={styles.challengeContent}>
-                    <Trophy color={colors.white} size={32} />
-                    <Text style={styles.challengeTitle}>
-                      {featuredChallenge.title}
-                    </Text>
-                    <Text style={styles.challengeSubtitle}>
-                      {featuredChallenge.description}
-                    </Text>
-                    <View style={styles.statsRow}>
-                      <View style={styles.stat}>
-                        <Users size={16} color={colors.white} />
-                        <Text style={styles.statText}>
-                          {featuredChallenge.totalParticipants} participants
-                        </Text>
-                      </View>
-                      <View style={styles.stat}>
-                        <TrendingUp size={16} color={colors.white} />
-                        <Text style={styles.statText}>
-                          {featuredChallenge.poolAmount}{' '}
-                          {featuredChallenge.stake.token} pool
-                        </Text>
-                      </View>
-                    </View>
-                    <Pressable
-                      style={styles.joinButton}
-                      onPress={() => handleJoinChallenge(featuredChallenge.id)}
-                    >
-                      <Text style={styles.joinButtonText}>Join Challenge</Text>
-                    </Pressable>
-                  </View>
-                </LinearGradient>
-              </View>
-            )}
-
-            <Text style={styles.sectionTitle}>Upcoming Challenges</Text>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>
+              {filters.status === 'active'
+                ? 'Active Challenges'
+                : filters.status === 'completed'
+                ? 'Completed Challenges'
+                : 'All Challenges'}
+            </Text>
             <View style={styles.challengesList}>
-              {challenges.slice(1).map((challenge) => (
-                <View key={challenge.id} style={styles.challengeCard}>
-                  <Text style={styles.challengeCardTitle}>
-                    {challenge.title}
-                  </Text>
-                  <Text style={styles.challengeCardDesc}>
-                    {challenge.description}
-                  </Text>
-                  <View style={styles.challengeCardFooter}>
-                    <Text style={styles.challengeCardStat}>
-                      {challenge.totalParticipants} participants
-                    </Text>
-                    <Pressable
-                      style={styles.smallJoinButton}
-                      onPress={() => handleJoinChallenge(challenge.id)}
-                    >
-                      <Text style={styles.smallJoinButtonText}>Join</Text>
-                    </Pressable>
-                  </View>
-                </View>
+              {challenges.map((challenge) => (
+                <ChallengeCard
+                  key={challenge.id}
+                  challenge={challenge}
+                  onJoin={handleJoinChallenge}
+                  isJoining={joiningChallengeId === challenge.id}
+                />
               ))}
             </View>
-          </>
+          </View>
         )}
       </ScrollView>
+
+      {/* Challenge Creation Modal */}
+      <CreateChallengeModal
+        visible={createModalVisible}
+        onClose={() => setCreateModalVisible(false)}
+        onSubmit={handleCreateChallenge}
+        isCreating={isCreating}
+        challenge={newChallenge}
+        onChange={handleChallengeFormChange}
+      />
+
+      {/* Filter Modal */}
+      <FilterModal
+        visible={filterModalVisible}
+        onClose={() => setFilterModalVisible(false)}
+        onApply={handleApplyFilters}
+        onClearFilters={clearFilters}
+        filters={filters}
+        setFilters={setFilters}
+      />
     </View>
   );
 }
@@ -256,11 +454,20 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     fontSize: fontSize.md,
   },
+  section: {
+    padding: spacing.md,
+  },
+  sectionTitle: {
+    fontSize: fontSize.xl,
+    fontWeight: fontWeight.bold,
+    color: colors.white,
+    marginBottom: spacing.md,
+  },
   errorContainer: {
     margin: spacing.md,
     padding: spacing.lg,
     backgroundColor: colors.gray[900],
-    borderRadius: borderRadius.lg,
+    borderRadius: 12,
     alignItems: 'center',
   },
   errorText: {
@@ -273,123 +480,105 @@ const styles = StyleSheet.create({
     backgroundColor: colors.gray[700],
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.md,
+    borderRadius: 8,
   },
   retryButtonText: {
     color: colors.white,
     fontSize: fontSize.sm,
     fontWeight: fontWeight.medium,
   },
-  emptyContainer: {
-    margin: spacing.md,
-    padding: spacing.xl,
-    backgroundColor: colors.gray[900],
-    borderRadius: borderRadius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyText: {
-    color: colors.gray[400],
-    fontSize: fontSize.md,
-    marginTop: spacing.md,
-    textAlign: 'center',
-  },
-  featuredChallenge: {
-    margin: spacing.md,
-    borderRadius: borderRadius.xl,
-    overflow: 'hidden',
-    ...shadows.md,
-  },
-  gradientBg: {
-    padding: spacing.lg,
-  },
-  challengeContent: {
-    gap: spacing.sm,
-  },
-  challengeTitle: {
-    fontSize: fontSize.xxl,
-    fontWeight: fontWeight.bold,
-    color: colors.white,
-    marginTop: spacing.sm,
-  },
-  challengeSubtitle: {
-    fontSize: fontSize.md,
-    color: colors.gray[100],
-    marginBottom: spacing.sm,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginTop: spacing.sm,
-  },
-  stat: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs + 2,
-  },
-  statText: {
-    color: colors.white,
-    fontSize: fontSize.sm,
-  },
-  joinButton: {
-    backgroundColor: colors.white,
-    padding: spacing.md,
-    borderRadius: borderRadius.lg,
-    alignItems: 'center',
-    marginTop: spacing.md,
-    ...shadows.sm,
-  },
-  joinButtonText: {
-    color: colors.accent.primary,
-    fontSize: fontSize.md,
-    fontWeight: fontWeight.bold,
-  },
-  sectionTitle: {
-    fontSize: fontSize.xl,
-    fontWeight: fontWeight.bold,
-    color: colors.white,
-    marginHorizontal: spacing.md,
-    marginTop: spacing.md,
-  },
   challengesList: {
-    padding: spacing.md,
+    gap: spacing.md,
+  },
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.md,
+    gap: spacing.sm,
   },
   challengeCard: {
     backgroundColor: colors.gray[900],
     borderRadius: borderRadius.lg,
     padding: spacing.md,
-    marginBottom: spacing.md,
     ...shadows.sm,
+  },
+  challengeCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
   },
   challengeCardTitle: {
     fontSize: fontSize.lg,
     fontWeight: fontWeight.bold,
     color: colors.white,
-    marginBottom: spacing.xs,
+    flex: 1,
   },
   challengeCardDesc: {
     fontSize: fontSize.sm,
     color: colors.gray[300],
     marginBottom: spacing.md,
   },
+  challengeCardDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
+    backgroundColor: colors.gray[800],
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+  },
+  detailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  detailText: {
+    color: colors.gray[300],
+    fontSize: fontSize.xs,
+  },
   challengeCardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  challengeCardStat: {
+  challengeCardEndDate: {
     fontSize: fontSize.sm,
-    color: colors.gray[400],
+    color: colors.accent.primary,
+    fontWeight: fontWeight.medium,
   },
-  smallJoinButton: {
+  joinButton: {
     backgroundColor: colors.accent.primary,
     paddingVertical: spacing.xs,
     paddingHorizontal: spacing.md,
     borderRadius: borderRadius.md,
+    minWidth: 60,
+    alignItems: 'center',
   },
-  smallJoinButtonText: {
+  joinButtonText: {
     color: colors.white,
     fontSize: fontSize.sm,
     fontWeight: fontWeight.medium,
+  },
+  needsParticipantsBadge: {
+    backgroundColor: colors.accent.secondary,
+    paddingVertical: 2,
+    paddingHorizontal: spacing.xs,
+    borderRadius: borderRadius.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  needsParticipantsText: {
+    color: colors.white,
+    fontSize: 10,
+    fontWeight: fontWeight.medium,
+  },
+  joinPromptText: {
+    color: colors.accent.secondary,
+    fontSize: fontSize.xs,
+    marginTop: spacing.xs,
+    marginBottom: spacing.sm,
+    fontStyle: 'italic',
   },
 });

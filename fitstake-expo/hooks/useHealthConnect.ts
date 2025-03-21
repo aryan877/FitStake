@@ -1,13 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
+import { StepsData } from '../app/services/api';
 
 // Health Connect is only available on Android
 const isAndroid = Platform.OS === 'android';
-
-export interface StepsData {
-  count: number;
-  date: string;
-}
 
 export const useHealthConnect = () => {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -175,6 +171,120 @@ export const useHealthConnect = () => {
     return fetchStepsDataDirect(true);
   }, [isInitialized, hasPermissions]);
 
+  // Get steps data for the last week (for challenge progress tracking)
+  const getStepsForLastWeek = useCallback(async () => {
+    if (!isAndroid) return [];
+
+    if (!isInitialized || !hasPermissions) {
+      const initialized = await initialize();
+      if (initialized) {
+        let hasPerms = await checkPermissions();
+        if (!hasPerms) {
+          hasPerms = await requestPermissions();
+        }
+        if (!hasPerms) return [];
+      } else {
+        return [];
+      }
+    }
+
+    return fetchStepsDataDirect(true);
+  }, [
+    isInitialized,
+    hasPermissions,
+    initialize,
+    checkPermissions,
+    requestPermissions,
+  ]);
+
+  // Fetch steps data for a specific date range
+  const fetchStepsForDateRange = useCallback(
+    async (startDate: Date, endDate: Date) => {
+      if (!isAndroid || !isInitialized || !hasPermissions) return [];
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const { readRecords } = await import('react-native-health-connect');
+        const results: StepsData[] = [];
+
+        // Clone dates to avoid modifying the original
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+
+        // Set time to beginning and end of day
+        start.setHours(0, 0, 0, 0);
+        end.setHours(23, 59, 59, 999);
+
+        // Calculate number of days in range
+        const dayDiff = Math.ceil(
+          (end.getTime() - start.getTime()) / (1000 * 3600 * 24)
+        );
+
+        // For each day in the range
+        for (let i = 0; i <= dayDiff; i++) {
+          const date = new Date(start);
+          date.setDate(start.getDate() + i);
+          const displayDate = date.toLocaleDateString();
+
+          const dayStart = new Date(date);
+          dayStart.setHours(0, 0, 0, 0);
+
+          const dayEnd = new Date(date);
+          dayEnd.setHours(23, 59, 59, 999);
+
+          try {
+            // Read steps for this day
+            const stepsResponse = await readRecords('Steps', {
+              timeRangeFilter: {
+                operator: 'between',
+                startTime: dayStart.toISOString(),
+                endTime: dayEnd.toISOString(),
+              },
+            });
+
+            // Filter automatic records and sum steps
+            let totalSteps = 0;
+
+            if (stepsResponse && stepsResponse.records) {
+              const automaticRecords = stepsResponse.records.filter(
+                (record) =>
+                  record.metadata && record.metadata.recordingMethod === 2
+              );
+
+              automaticRecords.forEach((record) => {
+                if (record.count) {
+                  totalSteps += record.count;
+                }
+              });
+            }
+
+            results.push({
+              date: displayDate,
+              count: totalSteps,
+            });
+          } catch (dayErr) {
+            console.error(`Error fetching steps for ${displayDate}:`, dayErr);
+            results.push({
+              date: displayDate,
+              count: 0,
+            });
+          }
+        }
+
+        setLoading(false);
+        return results;
+      } catch (err) {
+        console.error('Failed to fetch steps data for date range:', err);
+        setError('Failed to fetch steps data for date range');
+        setLoading(false);
+        return [];
+      }
+    },
+    [isInitialized, hasPermissions]
+  );
+
   const setupHealthConnect = useCallback(async () => {
     if (setupCompleted.current) return;
 
@@ -224,7 +334,9 @@ export const useHealthConnect = () => {
     initialize,
     requestPermissions,
     fetchStepsData,
+    fetchStepsForDateRange,
     setupHealthConnect,
     refreshStepsData,
+    getStepsForLastWeek,
   };
 };

@@ -1,6 +1,13 @@
 import mongoose, { Document, Schema } from "mongoose";
 
 export interface Challenge extends Document {
+  challengeId: string; // Unique ID from smart contract
+  solanaChallengePda: string; // Challenge PDA on Solana
+  solanaVaultPda: string; // Vault PDA that holds staked tokens
+  authority: string; // Challenge creator's wallet address
+  admin: string; // Admin address with special privileges
+
+  // Challenge details
   title: string;
   description: string;
   type: "STEPS";
@@ -8,32 +15,80 @@ export interface Challenge extends Document {
     value: number;
     unit: string;
   };
-  duration: {
-    days: number;
-    startDate?: Date;
-    endDate?: Date;
-  };
-  stake: {
-    amount: number;
-    token: string;
-  };
-  participants: {
-    did: string;
-    walletAddress: string;
-    status: "ACTIVE" | "COMPLETED" | "FAILED";
-    joinedAt: Date;
-  }[];
+
+  // Time periods
+  startTime: number; // Unix timestamp from smart contract
+  endTime: number; // Unix timestamp from smart contract
+
+  // Stake details (from smart contract)
+  stakeAmount: number; // Amount in lamports
+  minParticipants: number;
+  maxParticipants: number;
+  participantCount: number;
+  totalStake: number; // Total tokens staked
+  token: string; // Token mint address
+
+  // Status flags (from smart contract)
   isActive: boolean;
-  createdBy: string; // User DID
-  poolAmount: number;
-  completedCount: number;
-  totalParticipants: number;
+  isCompleted: boolean;
+
+  // Participants (indexed from blockchain events)
+  participants: {
+    walletAddress: string;
+    did?: string; // Optional user DID if mapped in our system
+    stakeAmount: number;
+    completed: boolean; // From smart contract
+    claimed: boolean; // From smart contract
+    joinedAt: Date;
+    // Local data for app experience
+    healthData?: {
+      date: string;
+      steps: number;
+      lastUpdated: Date;
+    }[];
+    progress?: number; // Percentage of goal complete
+  }[];
+
+  // Webhook tracking
+  lastIndexedBlock: number;
+  lastIndexedTransaction: string;
+  lastEventTimestamp: Date;
+
+  // Used for UI and reporting
+  successRate?: number;
+
+  // Timestamps
   createdAt: Date;
   updatedAt: Date;
 }
 
 const ChallengeSchema: Schema = new Schema(
   {
+    // Smart contract data
+    challengeId: {
+      type: String,
+      required: true,
+      unique: true,
+    },
+    solanaChallengePda: {
+      type: String,
+      required: true,
+      unique: true,
+    },
+    solanaVaultPda: {
+      type: String,
+      required: true,
+    },
+    authority: {
+      type: String,
+      required: true,
+    },
+    admin: {
+      type: String,
+      required: true,
+    },
+
+    // Challenge details
     title: {
       type: String,
       required: true,
@@ -58,69 +113,112 @@ const ChallengeSchema: Schema = new Schema(
         required: true,
       },
     },
-    duration: {
-      days: {
-        type: Number,
-        required: true,
-      },
-      startDate: {
-        type: Date,
-      },
-      endDate: {
-        type: Date,
-      },
+
+    // Time periods
+    startTime: {
+      type: Number, // Unix timestamp
+      required: true,
     },
-    stake: {
-      amount: {
-        type: Number,
-        required: true,
-      },
-      token: {
-        type: String,
-        required: true,
-        default: "SOL",
-      },
+    endTime: {
+      type: Number, // Unix timestamp
+      required: true,
     },
+
+    // Stake details
+    stakeAmount: {
+      type: Number,
+      required: true,
+    },
+    minParticipants: {
+      type: Number,
+      required: true,
+    },
+    maxParticipants: {
+      type: Number,
+      required: true,
+    },
+    participantCount: {
+      type: Number,
+      default: 0,
+    },
+    totalStake: {
+      type: Number,
+      default: 0,
+    },
+    token: {
+      type: String,
+      required: true,
+    },
+
+    // Status flags
+    isActive: {
+      type: Boolean,
+      default: false,
+    },
+    isCompleted: {
+      type: Boolean,
+      default: false,
+    },
+
+    // Participants
     participants: [
       {
-        did: {
-          type: String,
-          required: true,
-        },
         walletAddress: {
           type: String,
           required: true,
         },
-        status: {
+        did: {
           type: String,
-          enum: ["ACTIVE", "COMPLETED", "FAILED"],
-          default: "ACTIVE",
+        },
+        stakeAmount: {
+          type: Number,
+          required: true,
+        },
+        completed: {
+          type: Boolean,
+          default: false,
+        },
+        claimed: {
+          type: Boolean,
+          default: false,
         },
         joinedAt: {
           type: Date,
           default: Date.now,
         },
+        healthData: [
+          {
+            date: {
+              type: String,
+              required: true,
+            },
+            steps: {
+              type: Number,
+              required: true,
+            },
+            lastUpdated: {
+              type: Date,
+              default: Date.now,
+            },
+          },
+        ],
+        progress: {
+          type: Number,
+          default: 0,
+        },
       },
     ],
-    isActive: {
-      type: Boolean,
-      default: true,
+
+    // Webhook tracking
+    lastIndexedBlock: {
+      type: Number,
+      default: 0,
     },
-    createdBy: {
+    lastIndexedTransaction: {
       type: String,
-      required: true,
     },
-    poolAmount: {
-      type: Number,
-      default: 0,
-    },
-    completedCount: {
-      type: Number,
-      default: 0,
-    },
-    totalParticipants: {
-      type: Number,
-      default: 0,
+    lastEventTimestamp: {
+      type: Date,
     },
   },
   {
@@ -138,19 +236,21 @@ const ChallengeSchema: Schema = new Schema(
 
 // Virtual for calculating success rate
 ChallengeSchema.virtual("successRate").get(function (this: Challenge) {
-  if (this.totalParticipants === 0) return 0;
-  return (this.completedCount / this.totalParticipants) * 100;
-});
-
-// Pre-save hook to update the total participants count
-ChallengeSchema.pre("save", function (this: Challenge, next) {
-  this.totalParticipants = this.participants.length;
-  next();
+  const completedParticipants = this.participants.filter(
+    (p) => p.completed
+  ).length;
+  if (this.participantCount === 0) return 0;
+  return (completedParticipants / this.participantCount) * 100;
 });
 
 // Index for efficient queries
-ChallengeSchema.index({ isActive: 1 });
+ChallengeSchema.index({ solanaChallengePda: 1 }, { unique: true });
+ChallengeSchema.index({ challengeId: 1 }, { unique: true });
+ChallengeSchema.index({ "participants.walletAddress": 1 });
 ChallengeSchema.index({ "participants.did": 1 });
-ChallengeSchema.index({ createdBy: 1 });
+ChallengeSchema.index({ isActive: 1 });
+ChallengeSchema.index({ isCompleted: 1 });
+ChallengeSchema.index({ authority: 1 });
+ChallengeSchema.index({ endTime: 1, isCompleted: 1 }); // For finding ended challenges
 
 export default mongoose.model<Challenge>("Challenge", ChallengeSchema);

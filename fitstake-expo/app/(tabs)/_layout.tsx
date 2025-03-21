@@ -34,7 +34,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="progress"
         options={{
-          title: 'Progress',
+          title: 'My Challenges',
           tabBarIcon: ({ color, size }: TabBarIconProps) => (
             <Activity size={size} color={color} />
           ),

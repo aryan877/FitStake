@@ -1,8 +1,11 @@
+// Import the nodeify shims first
+import './shim';
+
 // Add buffer for Solana integration first
 import { Buffer } from 'buffer';
 global.Buffer = Buffer;
 
-// Import required polyfills in the right order
+// Polyfill for Anchor and other Node.js dependencies
 import 'fast-text-encoding';
 import 'react-native-get-random-values';
 // Import the crypto module from expo-crypto instead of using v4 from uuid
@@ -25,6 +28,14 @@ if (typeof global.crypto.randomUUID !== 'function') {
   global.crypto.randomUUID = function randomUUID() {
     return Crypto.randomUUID();
   };
+}
+
+// Additional TextEncoder/Decoder polyfills if needed
+if (typeof global.TextEncoder === 'undefined') {
+  global.TextEncoder = require('text-encoding').TextEncoder;
+}
+if (typeof global.TextDecoder === 'undefined') {
+  global.TextDecoder = require('text-encoding').TextDecoder;
 }
 
 // Then import the expo router

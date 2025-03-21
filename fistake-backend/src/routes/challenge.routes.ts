@@ -5,7 +5,6 @@ import {
   getChallenges,
   getUserChallenges,
   joinChallenge,
-  updateChallengeStatus,
 } from "../controllers/challenge.controller";
 import { authenticatePrivyToken } from "../middleware/auth.middleware";
 
@@ -19,6 +18,5 @@ router.get("/:id", getChallengeById);
 router.get("/user/challenges", authenticatePrivyToken, getUserChallenges);
 router.post("/", authenticatePrivyToken, createChallenge);
 router.post("/:id/join", authenticatePrivyToken, joinChallenge);
-router.patch("/:id/status", authenticatePrivyToken, updateChallengeStatus);
 
 export default router;

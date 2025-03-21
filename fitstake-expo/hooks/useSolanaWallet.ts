@@ -28,6 +28,11 @@ export interface SolanaWalletState {
   isLoadingTx: boolean;
 }
 
+/**
+ * Hook for interacting with Solana wallet functionality
+ * Provides wallet address, balance, transaction management,
+ * and blockchain interaction capabilities
+ */
 export const useSolanaWallet = () => {
   const { wallets } = useEmbeddedSolanaWallet();
   const [state, setState] = useState<SolanaWalletState>({
@@ -41,7 +46,10 @@ export const useSolanaWallet = () => {
   });
   const [connection, setConnection] = useState<Connection | null>(null);
 
-  // Initialize connection
+  /**
+   * Initializes connection to Solana blockchain
+   * Uses environment RPC URL or defaults to devnet
+   */
   const initializeConnection = useCallback(async () => {
     if (connection) return connection;
 
@@ -50,16 +58,11 @@ export const useSolanaWallet = () => {
     try {
       const rpcUrl =
         process.env.EXPO_PUBLIC_SOLANA_RPC_URL || clusterApiUrl('devnet');
-      console.log('Connecting to Solana RPC:', rpcUrl);
-
       const conn = new Connection(rpcUrl, 'confirmed');
-      console.log('Connection established:', conn);
       setConnection(conn);
-
       setState((prev) => ({ ...prev, connectionStatus: 'ready' }));
       return conn;
     } catch (error) {
-      console.error('Failed to initialize Solana connection:', error);
       setState((prev) => ({
         ...prev,
         error: 'Failed to connect to Solana network',
@@ -70,7 +73,10 @@ export const useSolanaWallet = () => {
     }
   }, [connection]);
 
-  // Get the wallet provider from Privy
+  /**
+   * Gets the Solana wallet provider from Privy
+   * Returns null if no wallets are available
+   */
   const getProvider = useCallback(async () => {
     if (!wallets || wallets.length === 0) return null;
     const wallet = wallets[0];
@@ -78,7 +84,10 @@ export const useSolanaWallet = () => {
     return wallet.getProvider();
   }, [wallets]);
 
-  // Fetch wallet address from backend and balance from Solana
+  /**
+   * Fetches wallet address from backend profile
+   * and current balance from Solana blockchain
+   */
   const fetchWalletInfo = useCallback(async () => {
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
@@ -121,7 +130,6 @@ export const useSolanaWallet = () => {
         const publicKey = new PublicKey(walletAddress);
 
         // Get balance using the connection
-        console.log('Fetching balance for public key:', publicKey.toString());
         const balanceInLamports = await conn.getBalance(publicKey);
         const balanceInSol = balanceInLamports / LAMPORTS_PER_SOL;
 
@@ -132,7 +140,6 @@ export const useSolanaWallet = () => {
           error: null,
         }));
       } catch (balanceError) {
-        console.error('Balance fetch error:', balanceError);
         setState((prev) => ({
           ...prev,
           balance: 0,
@@ -145,7 +152,6 @@ export const useSolanaWallet = () => {
         }));
       }
     } catch (error) {
-      console.error('Profile fetch error:', error);
       setState((prev) => ({
         ...prev,
         isLoading: false,
@@ -156,7 +162,10 @@ export const useSolanaWallet = () => {
     }
   }, [connection, initializeConnection]);
 
-  // Send a transaction
+  /**
+   * Sends a transaction to the Solana blockchain
+   * Uses Privy's embedded wallet provider to sign and send
+   */
   const sendTransaction = useCallback(
     async (
       transaction: Transaction | VersionedTransaction
@@ -185,6 +194,59 @@ export const useSolanaWallet = () => {
           return { success: false, error: 'Provider not available' };
         }
 
+        // Set recent blockhash and fee payer if it's a legacy transaction
+        if (transaction instanceof Transaction) {
+          const { blockhash, lastValidBlockHeight } =
+            await conn.getLatestBlockhash('finalized');
+          transaction.recentBlockhash = blockhash;
+          transaction.lastValidBlockHeight = lastValidBlockHeight;
+
+          // Set fee payer to the user's wallet
+          transaction.feePayer = new PublicKey(state.address);
+
+          console.log('Transaction prepared:', {
+            feePayer: transaction.feePayer.toString(),
+            recentBlockhash: transaction.recentBlockhash,
+            numInstructions: transaction.instructions.length,
+          });
+
+          // Verify the transaction before sending
+          try {
+            const simulation = await conn.simulateTransaction(transaction);
+            if (simulation.value.err) {
+              console.error('Transaction simulation failed:', simulation.value);
+
+              // Extract more detailed error information
+              let errorMsg = 'Simulation error';
+              if (simulation.value.logs && simulation.value.logs.length > 0) {
+                const errorLogs = simulation.value.logs
+                  .filter(
+                    (log) =>
+                      log.includes('Error') ||
+                      log.includes('error') ||
+                      log.includes('failed')
+                  )
+                  .join('\n');
+                errorMsg = `${errorMsg}: ${errorLogs}`;
+              } else {
+                errorMsg = `${errorMsg}: ${JSON.stringify(
+                  simulation.value.err
+                )}`;
+              }
+
+              return {
+                success: false,
+                error: errorMsg,
+              };
+            }
+            console.log('Transaction simulation succeeded');
+          } catch (simError) {
+            console.error('Failed to simulate transaction:', simError);
+            // Continue with the transaction even if simulation fails
+          }
+        }
+
+        console.log('Sending transaction...');
         const { signature } = await provider.request({
           method: 'signAndSendTransaction',
           params: {
@@ -192,6 +254,35 @@ export const useSolanaWallet = () => {
             connection: conn,
           },
         });
+        console.log('Transaction sent, signature:', signature);
+
+        // Wait for confirmation
+        try {
+          const confirmation = await conn.confirmTransaction(
+            signature,
+            'confirmed'
+          );
+          if (confirmation.value.err) {
+            console.error(
+              'Transaction failed on-chain:',
+              confirmation.value.err
+            );
+            return {
+              success: false,
+              error: `Transaction failed: ${JSON.stringify(
+                confirmation.value.err
+              )}`,
+              signature,
+            };
+          }
+          console.log('Transaction confirmed successfully');
+        } catch (confirmError) {
+          console.warn(
+            'Could not confirm transaction, but it might still succeed:',
+            confirmError
+          );
+          // Continue since the transaction was sent
+        }
 
         // Refresh balance after transaction
         fetchWalletInfo();
@@ -199,9 +290,15 @@ export const useSolanaWallet = () => {
         return { success: true, signature };
       } catch (error: any) {
         console.error('Transaction error:', error);
+        // Try to extract more detailed error information
+        const errorMessage = error?.message || 'Failed to send transaction';
+        const errorLogs = error?.logs || [];
+        if (errorLogs.length > 0) {
+          console.error('Error logs:', errorLogs);
+        }
         return {
           success: false,
-          error: error?.message || 'Failed to send transaction',
+          error: errorMessage,
         };
       }
     },
@@ -214,7 +311,10 @@ export const useSolanaWallet = () => {
     ]
   );
 
-  // Sign a message
+  /**
+   * Signs a message using the Solana wallet
+   * Returns the signature or error message
+   */
   const signMessage = useCallback(
     async (
       message: string
@@ -235,7 +335,6 @@ export const useSolanaWallet = () => {
 
         return { success: true, signature };
       } catch (error: any) {
-        console.error('Message signing error:', error);
         return {
           success: false,
           error: error?.message || 'Failed to sign message',
@@ -257,127 +356,46 @@ export const useSolanaWallet = () => {
     }
   }, [state.connectionStatus, connection, fetchWalletInfo]);
 
-  // Fetch recent transactions for the wallet
+  /**
+   * Fetches recent transactions for the current wallet
+   * Processes transaction data to determine amounts and directions
+   */
   const fetchRecentTransactions = useCallback(async () => {
     const { address } = state;
-    if (!address) return;
-    if (!connection) {
-      console.log('No Solana connection available for fetching transactions');
-      return;
-    }
+    if (!address || !connection) return;
+
+    setState((prev) => ({ ...prev, isLoadingTx: true }));
 
     try {
-      setState((prev) => ({ ...prev, isLoadingTx: true }));
-
       // Create a valid PublicKey object
       const pubKey = new PublicKey(address);
 
-      try {
-        // Get signatures with error handling
-        const signatures = await connection.getSignaturesForAddress(pubKey, {
-          limit: 10,
-        });
+      // Get signatures with error handling
+      const signatures = await connection.getSignaturesForAddress(pubKey, {
+        limit: 10,
+      });
 
-        if (!signatures || signatures.length === 0) {
-          // No transactions found
-          setState((prev) => ({
-            ...prev,
-            transactions: [],
-            isLoadingTx: false,
-          }));
-          return;
-        }
+      if (!signatures || signatures.length === 0) {
+        // No transactions found
+        setState((prev) => ({
+          ...prev,
+          transactions: [],
+          isLoadingTx: false,
+        }));
+        return;
+      }
 
-        // Process each transaction safely
-        const txs = await Promise.all(
-          signatures.map(async (sig) => {
-            try {
-              // Get transaction details with error handling
-              const tx = await connection.getTransaction(sig.signature, {
-                maxSupportedTransactionVersion: 0,
-              });
+      // Process each transaction
+      const txs = await Promise.all(
+        signatures.map(async (sig) => {
+          try {
+            // Get transaction details with error handling
+            const tx = await connection.getTransaction(sig.signature, {
+              maxSupportedTransactionVersion: 0,
+            });
 
-              // Skip if transaction data is missing
-              if (!tx || !tx.meta) {
-                return {
-                  signature: sig.signature,
-                  timestamp: sig.blockTime
-                    ? new Date(sig.blockTime * 1000)
-                    : new Date(),
-                  amount: 0,
-                  isReceived: false,
-                  type: sig.memo || 'Transaction',
-                };
-              }
-
-              // Find our wallet's index in the account keys
-              const myAddressStr = address;
-              let isReceived = false;
-              let amount = 0;
-
-              // Compare pre and post balances to determine transaction direction
-              if (tx.meta && tx.meta.preBalances && tx.meta.postBalances) {
-                // Get accounts from transaction
-                let accountIndices = [];
-
-                // Try to find our account in the account list - multiple approaches for compatibility
-                if (tx.transaction.message) {
-                  // For legacy transactions
-                  if ('accountKeys' in tx.transaction.message) {
-                    // @ts-ignore - handle legacy transaction format
-                    const accounts = tx.transaction.message.accountKeys;
-                    for (let i = 0; i < accounts.length; i++) {
-                      if (accounts[i].toString() === myAddressStr) {
-                        accountIndices.push(i);
-                      }
-                    }
-                  }
-                  // For versioned transactions
-                  else if ('getAccountKeys' in tx.transaction.message) {
-                    // @ts-ignore - handle VersionedMessage
-                    const accountKeys = tx.transaction.message.getAccountKeys();
-                    const staticKeys = accountKeys?.staticAccountKeys || [];
-                    for (let i = 0; i < staticKeys.length; i++) {
-                      if (staticKeys[i].toString() === myAddressStr) {
-                        accountIndices.push(i);
-                      }
-                    }
-                  }
-                }
-
-                // If we found our account, check balance change
-                if (accountIndices.length > 0) {
-                  // Check first occurrence of our account
-                  const myIndex = accountIndices[0];
-                  const preBalance = tx.meta.preBalances[myIndex];
-                  const postBalance = tx.meta.postBalances[myIndex];
-                  const balanceChange = postBalance - preBalance;
-
-                  // Use absolute value for display, and set direction flag
-                  amount = Math.abs(balanceChange) / LAMPORTS_PER_SOL;
-                  isReceived = balanceChange > 0;
-                } else {
-                  // Fallback: If we can't identify our account specifically
-                  const firstAccountBalanceChange =
-                    tx.meta.postBalances[0] - tx.meta.preBalances[0];
-                  amount =
-                    Math.abs(firstAccountBalanceChange) / LAMPORTS_PER_SOL;
-                  isReceived = firstAccountBalanceChange > 0;
-                }
-              }
-
-              return {
-                signature: sig.signature,
-                timestamp: sig.blockTime
-                  ? new Date(sig.blockTime * 1000)
-                  : new Date(),
-                amount,
-                isReceived,
-                type: sig.memo || (isReceived ? 'Received' : 'Sent'),
-              };
-            } catch (txError) {
-              console.log('Error fetching transaction details:', txError);
-              // Return a placeholder for this transaction
+            // Skip if transaction data is missing
+            if (!tx || !tx.meta) {
               return {
                 signature: sig.signature,
                 timestamp: sig.blockTime
@@ -385,23 +403,93 @@ export const useSolanaWallet = () => {
                   : new Date(),
                 amount: 0,
                 isReceived: false,
-                type: 'Unknown Transaction',
+                type: sig.memo || 'Transaction',
               };
             }
-          })
-        );
 
-        setState((prev) => ({
-          ...prev,
-          transactions: txs,
-          isLoadingTx: false,
-        }));
-      } catch (sigError) {
-        console.error('Error fetching signatures:', sigError);
-        setState((prev) => ({ ...prev, transactions: [], isLoadingTx: false }));
-      }
+            // Find our wallet's index in the account keys
+            const myAddressStr = address;
+            let isReceived = false;
+            let amount = 0;
+
+            // Compare pre and post balances to determine transaction direction
+            if (tx.meta && tx.meta.preBalances && tx.meta.postBalances) {
+              // Get accounts from transaction
+              let accountIndices = [];
+
+              // Try to find our account in the account list - multiple approaches for compatibility
+              if (tx.transaction.message) {
+                // For legacy transactions
+                if ('accountKeys' in tx.transaction.message) {
+                  const accounts = tx.transaction.message.accountKeys;
+                  for (let i = 0; i < accounts.length; i++) {
+                    if (accounts[i].toString() === myAddressStr) {
+                      accountIndices.push(i);
+                    }
+                  }
+                }
+                // For versioned transactions
+                else if ('getAccountKeys' in tx.transaction.message) {
+                  const accountKeys = tx.transaction.message.getAccountKeys();
+                  const staticKeys = accountKeys?.staticAccountKeys || [];
+                  for (let i = 0; i < staticKeys.length; i++) {
+                    if (staticKeys[i].toString() === myAddressStr) {
+                      accountIndices.push(i);
+                    }
+                  }
+                }
+              }
+
+              // If we found our account, check balance change
+              if (accountIndices.length > 0) {
+                // Check first occurrence of our account
+                const myIndex = accountIndices[0];
+                const preBalance = tx.meta.preBalances[myIndex];
+                const postBalance = tx.meta.postBalances[myIndex];
+                const balanceChange = postBalance - preBalance;
+
+                // Use absolute value for display, and set direction flag
+                amount = Math.abs(balanceChange) / LAMPORTS_PER_SOL;
+                isReceived = balanceChange > 0;
+              } else {
+                // Fallback: If we can't identify our account specifically
+                const firstAccountBalanceChange =
+                  tx.meta.postBalances[0] - tx.meta.preBalances[0];
+                amount = Math.abs(firstAccountBalanceChange) / LAMPORTS_PER_SOL;
+                isReceived = firstAccountBalanceChange > 0;
+              }
+            }
+
+            return {
+              signature: sig.signature,
+              timestamp: sig.blockTime
+                ? new Date(sig.blockTime * 1000)
+                : new Date(),
+              amount,
+              isReceived,
+              type: sig.memo || (isReceived ? 'Received' : 'Sent'),
+            };
+          } catch (txError) {
+            // Return a placeholder for this transaction on error
+            return {
+              signature: sig.signature,
+              timestamp: sig.blockTime
+                ? new Date(sig.blockTime * 1000)
+                : new Date(),
+              amount: 0,
+              isReceived: false,
+              type: 'Unknown Transaction',
+            };
+          }
+        })
+      );
+
+      setState((prev) => ({
+        ...prev,
+        transactions: txs,
+        isLoadingTx: false,
+      }));
     } catch (err) {
-      console.error('Error in fetchRecentTransactions:', err);
       setState((prev) => ({ ...prev, transactions: [], isLoadingTx: false }));
     }
   }, [connection, state.address]);
