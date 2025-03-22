@@ -1,11 +1,5 @@
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
-import {
-  createAccount,
-  createMint,
-  mintTo,
-  TOKEN_PROGRAM_ID,
-} from "@solana/spl-token";
 import { Accountability } from "../target/types/accountability";
 
 describe("accountability", () => {
@@ -16,12 +10,11 @@ describe("accountability", () => {
   const program = anchor.workspace.Accountability as Program<Accountability>;
 
   let challengeAccount: anchor.web3.PublicKey;
-  let mint: anchor.web3.PublicKey;
-  let participantTokenAccount: anchor.web3.PublicKey;
   let vaultAccount: anchor.web3.PublicKey;
+  let participantAccount: anchor.web3.PublicKey;
 
   const challengeId = "fitstake-test-" + Math.floor(Math.random() * 1000);
-  const stakeAmount = new anchor.BN(1000000); // 1 token with 6 decimals
+  const stakeAmount = new anchor.BN(1000000); // 1 SOL in lamports
   const startTime = new anchor.BN(Math.floor(Date.now() / 1000));
   const endTime = new anchor.BN(Math.floor(Date.now() / 1000) + 86400); // 24 hours
   const minParticipants = 2;
@@ -40,51 +33,20 @@ describe("accountability", () => {
       program.programId
     );
 
+    // Derive PDA for participant account
+    [participantAccount] = await anchor.web3.PublicKey.findProgramAddress(
+      [
+        Buffer.from("participant"),
+        challengeAccount.toBuffer(),
+        provider.wallet.publicKey.toBuffer(),
+      ],
+      program.programId
+    );
+
     console.log("Challenge account PDA:", challengeAccount.toString());
     console.log("Vault account PDA:", vaultAccount.toString());
+    console.log("Participant account PDA:", participantAccount.toString());
     console.log("Using wallet:", provider.wallet.publicKey.toString());
-
-    try {
-      // Create a token mint
-      const payer = provider.wallet as any; // This is a workaround - the wallet should have a signer
-      mint = await createMint(
-        provider.connection,
-        payer, // This might not work if the wallet doesn't implement the correct interface
-        provider.wallet.publicKey,
-        null,
-        6
-      );
-
-      console.log("Created token mint:", mint.toString());
-
-      // Create token account for participant
-      participantTokenAccount = await createAccount(
-        provider.connection,
-        payer,
-        mint,
-        provider.wallet.publicKey
-      );
-
-      console.log(
-        "Created participant token account:",
-        participantTokenAccount.toString()
-      );
-
-      // Mint tokens to participant
-      await mintTo(
-        provider.connection,
-        payer,
-        mint,
-        participantTokenAccount,
-        provider.wallet.publicKey,
-        10000000 // 10 tokens with 6 decimals
-      );
-
-      console.log("Minted tokens to participant");
-    } catch (error) {
-      console.error("Error setting up token:", error);
-      // We'll still continue with the test even if token setup fails
-    }
   });
 
   it("Creates a challenge", async () => {
@@ -139,35 +101,14 @@ describe("accountability", () => {
   });
 
   it("Allows a participant to join", async () => {
-    // Skip test if token setup failed
-    if (!mint || !participantTokenAccount) {
-      console.log("Skipping join test because token setup failed");
-      return;
-    }
-
     try {
-      // Generate a PDA for the participant
-      const [participantAccount] =
-        await anchor.web3.PublicKey.findProgramAddress(
-          [
-            Buffer.from("participant"),
-            challengeAccount.toBuffer(),
-            provider.wallet.publicKey.toBuffer(),
-          ],
-          program.programId
-        );
-
-      console.log("Participant account PDA:", participantAccount.toString());
-
       await program.methods
         .joinChallenge()
         .accounts({
           challenge: challengeAccount,
           participant: participantAccount,
-          participantTokenAccount,
           vault: vaultAccount,
           participantAuthority: provider.wallet.publicKey,
-          tokenProgram: TOKEN_PROGRAM_ID,
           systemProgram: anchor.web3.SystemProgram.programId,
         })
         .rpc();
@@ -188,9 +129,27 @@ describe("accountability", () => {
         completed: participant.completed,
         claimed: participant.claimed,
       });
+
+      // Basic validation
+      console.assert(
+        challenge.participantCount === 1,
+        "Participant count should be 1"
+      );
+      console.assert(
+        challenge.totalStake.toString() === stakeAmount.toString(),
+        "Total stake should match stake amount"
+      );
+      console.assert(
+        participant.stakeAmount.toString() === stakeAmount.toString(),
+        "Participant stake amount mismatch"
+      );
+      console.assert(
+        participant.completed === false,
+        "Participant should not be marked as completed"
+      );
     } catch (error) {
       console.error("Error joining challenge:", error);
-      // Don't throw here so the test can continue
+      throw error;
     }
   });
 });
