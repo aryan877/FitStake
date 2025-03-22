@@ -13,6 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { CreateChallengeModalProps } from '../../types/components';
 import theme from '../theme';
 
 const { colors, spacing, borderRadius, fontSize, fontWeight } = theme;
@@ -20,24 +21,6 @@ const { colors, spacing, borderRadius, fontSize, fontWeight } = theme;
 // Define maximum character limits
 const MAX_TITLE_LENGTH = 50;
 const MAX_DESCRIPTION_LENGTH = 250;
-
-interface CreateChallengeModalProps {
-  visible: boolean;
-  onClose: () => void;
-  onSubmit: () => void;
-  isCreating: boolean;
-  challenge: {
-    title: string;
-    description: string;
-    stakeAmount: string;
-    goalSteps: string;
-    startDate: Date;
-    endDate: Date;
-    minParticipants: string;
-    maxParticipants: string;
-  };
-  onChange: (field: string, value: string | Date) => void;
-}
 
 const CreateChallengeModal = ({
   visible,

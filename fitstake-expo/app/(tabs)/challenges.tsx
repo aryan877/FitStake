@@ -18,17 +18,11 @@ import { challengeApi } from '../services/api';
 import theme from '../theme';
 import { formatCountdown } from '../utils/dateFormatting';
 import { showErrorToast } from '../utils/errorHandling';
+import { UserChallenge } from '../types';
 
 const { colors, spacing, borderRadius, fontSize, fontWeight, shadows } = theme;
 
-interface UserChallenge {
-  id: string;
-  title: string;
-  description: string;
-  goal: {
-    value: number;
-    unit: string;
-  };
+;
   stakeAmount: number;
   token: string;
   endTime: number;

@@ -1,14 +1,9 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { EmptyStateProps } from '../../types';
 import theme from '../theme';
 
 const { colors, spacing, fontSize, borderRadius } = theme;
-
-interface EmptyStateProps {
-  icon: React.ReactNode;
-  title: string;
-  subtitle?: string;
-}
 
 const EmptyState = ({ icon, title, subtitle }: EmptyStateProps) => {
   return (

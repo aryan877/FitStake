@@ -1,3 +1,4 @@
+import { StepsData } from '@/types';
 import { usePrivy } from '@privy-io/expo';
 import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -17,7 +18,6 @@ import {
 import { useChallenges } from '../../hooks/useChallenges';
 import { useHealthConnect } from '../../hooks/useHealthConnect';
 import { useSolanaWallet } from '../../hooks/useSolanaWallet';
-import type { StepsData } from '../services/api';
 import { authApi } from '../services/api';
 import theme from '../theme';
 import { formatCountdown, formatDate } from '../utils/dateFormatting';

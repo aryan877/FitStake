@@ -9,24 +9,7 @@ import {
 } from '@solana/web3.js';
 import { useCallback, useEffect, useState } from 'react';
 import { authApi } from '../app/services/api';
-
-export interface TransactionInfo {
-  signature: string;
-  timestamp: Date;
-  amount: number;
-  isReceived: boolean;
-  type: string;
-}
-
-export interface SolanaWalletState {
-  address: string | null;
-  balance: number | null;
-  isLoading: boolean;
-  error: string | null;
-  connectionStatus: 'uninitialized' | 'initializing' | 'ready' | 'error';
-  transactions: TransactionInfo[];
-  isLoadingTx: boolean;
-}
+import { SolanaWalletState } from '../types';
 
 /**
  * Hook for interacting with Solana wallet functionality

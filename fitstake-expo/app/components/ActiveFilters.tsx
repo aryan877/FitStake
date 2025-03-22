@@ -1,7 +1,7 @@
 import { X } from 'lucide-react-native';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { ChallengeFilters } from '../../hooks/useChallenges';
+import { ChallengeFilters } from '../../types/challenge';
 import theme from '../theme';
 import FilterChip from './FilterChip';
 

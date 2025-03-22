@@ -9,7 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { ChallengeData } from '../../hooks/useChallenges';
+import { ChallengeData } from '../../types/challenge';
 import theme from '../theme';
 import { formatCountdown } from '../utils/dateFormatting';
 
@@ -20,7 +20,7 @@ const formatSolAmount = (lamports: number) => {
   return (lamports / LAMPORTS_PER_SOL).toFixed(2);
 };
 
-interface ChallengeCardProps {
+interface ExtendedChallengeCardProps {
   challenge: ChallengeData;
   onJoin: (id: string) => void;
   isJoining: boolean;
@@ -30,7 +30,7 @@ const ChallengeCard = ({
   challenge,
   onJoin,
   isJoining,
-}: ChallengeCardProps) => {
+}: ExtendedChallengeCardProps) => {
   const router = useRouter();
   // State to hold countdown text
   const [countdownText, setCountdownText] = useState(

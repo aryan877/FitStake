@@ -1,25 +1,7 @@
 import { getAccessToken } from '@privy-io/expo';
 import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 import axios from 'axios';
-
-export interface StepRecord {
-  count: number;
-  startTime: string;
-  endTime: string;
-  recordingMethod?: number;
-  dataOrigin?: string;
-  id?: string;
-  lastModifiedTime?: string;
-}
-
-export interface StepsData {
-  date: string;
-  count: number;
-  sources?: string[];
-  recordCount?: number;
-  timestamps?: number[];
-  records?: StepRecord[];
-}
+import { StepsData } from '../../types';
 
 // Get backend URL from environment variables
 const BACKEND_URL =

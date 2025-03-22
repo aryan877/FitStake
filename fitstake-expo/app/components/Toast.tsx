@@ -7,17 +7,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { ToastConfig } from '../../types';
 import theme from '../theme';
 
 const { colors, spacing, fontSize, fontWeight, borderRadius } = theme;
-
-export type ToastType = 'success' | 'error' | 'info';
-
-export interface ToastConfig {
-  message: string;
-  type: ToastType;
-  duration?: number;
-}
 
 let toastQueue: ToastConfig[] = [];
 let showToastFunction: ((config: ToastConfig) => void) | null = null;
@@ -147,7 +140,7 @@ export default function ToastContainer() {
       case 'success':
         return <CheckCircle size={24} color={colors.white} />;
       case 'error':
-        return <AlertCircle size={24} color={colors.white} />;
+        return <X size={24} color={colors.white} />;
       case 'info':
         return <AlertCircle size={24} color={colors.white} />;
       default:

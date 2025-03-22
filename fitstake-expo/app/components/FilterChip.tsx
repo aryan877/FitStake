@@ -1,12 +1,11 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import theme from '../theme';
+import { FilterChipProps } from '../../types';
 
 const { colors, spacing, borderRadius, fontSize } = theme;
 
-interface FilterChipProps {
-  label: string;
-}
+
 
 const FilterChip = ({ label }: FilterChipProps) => {
   return (

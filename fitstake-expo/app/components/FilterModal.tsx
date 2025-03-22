@@ -10,19 +10,11 @@ import {
 } from 'react-native';
 import { ChallengeFilters } from '../../hooks/useChallenges';
 import theme from '../theme';
+import { FilterModalProps } from '../../types';
 
 const { colors, spacing, borderRadius, fontSize, fontWeight } = theme;
 
-interface FilterModalProps {
-  visible: boolean;
-  onClose: () => void;
-  onApply: () => void;
-  onClearFilters: () => void;
-  filters: ChallengeFilters;
-  setFilters: (
-    filters: ChallengeFilters | ((prev: ChallengeFilters) => ChallengeFilters)
-  ) => void;
-}
+
 
 const FilterModal = ({
   visible,

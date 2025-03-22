@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { authApi } from '../services/api';
 import theme from '../theme';
+import { OnboardingModalProps } from '../../types';
 
 const { colors, fontSize, fontWeight, spacing } = theme;
 
@@ -21,10 +22,7 @@ type OnboardingStep =
   | 'username-setup'
   | 'completed';
 
-interface OnboardingModalProps {
-  visible: boolean;
-  onComplete: () => void;
-}
+
 
 const OnboardingModal: React.FC<OnboardingModalProps> = ({
   visible,

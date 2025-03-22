@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import theme from '../theme';
+import { AvatarProps } from '../../types';
 
 const { colors } = theme;
 
@@ -14,11 +15,7 @@ const getColorFromString = (str: string): string => {
   return `hsl(${h}, 70%, 55%)`;
 };
 
-interface AvatarProps {
-  user?: any;
-  size?: number;
-  name?: string;
-}
+
 
 const Avatar = ({ user, size = 40, name }: AvatarProps) => {
   let initial = '?';

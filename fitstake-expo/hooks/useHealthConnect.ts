@@ -1,19 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
-import { StepsData } from '../app/services/api';
+import { StepRecord, StepsData } from '../types';
 
 // Health Connect is only available on Android
 const isAndroid = Platform.OS === 'android';
-
-export interface StepRecord {
-  count: number;
-  startTime: string;
-  endTime: string;
-  recordingMethod?: number;
-  dataOrigin?: string;
-  id?: string;
-  lastModifiedTime?: string;
-}
 
 export const useHealthConnect = () => {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -115,22 +105,6 @@ export const useHealthConnect = () => {
               endTime: endDate.toISOString(),
             },
           });
-
-          console.log('=== HEALTH DATA BOUNDARY START ===');
-          console.log('Steps response details:');
-          console.log('- Page Token:', stepsResponse.pageToken);
-          console.log('- Records count:', stepsResponse.records?.length || 0);
-          console.log('- Records:');
-          stepsResponse.records?.forEach((record, index) => {
-            console.log(
-              `  [${index}] Count: ${record.count}, Start: ${record.startTime}, End: ${record.endTime}`
-            );
-            console.log(
-              `      Metadata:`,
-              JSON.stringify(record.metadata, null, 2)
-            );
-          });
-          console.log('=== HEALTH DATA BOUNDARY END ===');
 
           const totalSteps = aggregatedSteps.COUNT_TOTAL || 0;
           const dataSources = new Set<string>();

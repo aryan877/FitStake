@@ -2,7 +2,13 @@ import { usePrivy } from '@privy-io/expo';
 import { AnchorProvider, BN, Program, web3 } from '@project-serum/anchor';
 import { Connection, PublicKey, SystemProgram } from '@solana/web3.js';
 import { useCallback, useState } from 'react';
-import { challengeApi, StepsData } from '../app/services/api';
+import { challengeApi } from '../app/services/api';
+import {
+  ChallengeData,
+  ChallengeFilters,
+  CreateChallengeParams,
+  StepsData,
+} from '../types';
 import { useSolanaWallet } from './useSolanaWallet';
 
 // Import the IDL
@@ -16,78 +22,6 @@ const SOLANA_RPC_URL =
 const PROGRAM_ID = new PublicKey(
   '5hTA47XZPkJK7d6JrCEcmUaDbt6bgxNjgUDbRBo593er'
 );
-
-// Interface for challenge creation parameters
-interface CreateChallengeParams {
-  title: string;
-  description: string;
-  stakeAmount: number; // in lamports
-  startTime: number; // unix timestamp
-  endTime: number; // unix timestamp
-  minParticipants: number;
-  maxParticipants: number;
-  goalSteps: number;
-}
-
-// Interface for challenge data
-export interface ChallengeData {
-  id: string;
-  solanaChallengePda: string;
-  solanaVaultPda: string;
-  authority: string;
-  admin: string;
-  title: string;
-  description: string;
-  type: 'STEPS';
-  goal: {
-    value: number;
-    unit: string;
-  };
-  startTime: number;
-  endTime: number;
-  stakeAmount: number;
-  minParticipants: number;
-  maxParticipants: number;
-  participantCount: number;
-  totalStake: number;
-  token: string;
-  isActive: boolean;
-  isCompleted: boolean;
-  participants: Array<{
-    walletAddress: string;
-    did?: string;
-    stakeAmount: number;
-    completed: boolean;
-    claimed: boolean;
-    joinedAt: Date;
-    healthData?: StepsData[];
-    progress?: number;
-  }>;
-}
-
-// Interface for challenge progress
-export interface ChallengeProgress {
-  challengeId: string;
-  progress: number;
-  isCompleted: boolean;
-  totalSteps: number;
-}
-
-// Define filter parameters interface
-export interface ChallengeFilters {
-  type?: string;
-  status?: string;
-  minStake?: number;
-  maxStake?: number;
-  minGoal?: number;
-  maxGoal?: number;
-  minParticipants?: number;
-  maxParticipants?: number;
-  sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
-  page?: number;
-  limit?: number;
-}
 
 /**
  * Creates a wallet adapter for Anchor

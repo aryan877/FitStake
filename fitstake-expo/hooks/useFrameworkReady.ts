@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
 import { LogBox } from 'react-native';
+import { Window } from '../types';
 
 declare global {
-  interface Window {
-    frameworkReady?: () => void;
-  }
+  
 }
 
 export function useFrameworkReady() {

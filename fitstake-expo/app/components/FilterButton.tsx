@@ -1,15 +1,11 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity } from 'react-native';
 import theme from '../theme';
+import { FilterButtonProps } from '../../types';
 
 const { colors, spacing, borderRadius, fontSize, fontWeight } = theme;
 
-interface FilterButtonProps {
-  onPress: () => void;
-  text: string;
-  icon: React.ReactNode;
-  primary?: boolean;
-}
+
 
 const FilterButton = ({
   onPress,
