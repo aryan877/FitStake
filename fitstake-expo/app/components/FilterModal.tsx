@@ -8,13 +8,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { ChallengeFilters } from '../../hooks/useChallenges';
+import { ChallengeFilters, FilterModalProps } from '../../types';
 import theme from '../theme';
-import { FilterModalProps } from '../../types';
 
 const { colors, spacing, borderRadius, fontSize, fontWeight } = theme;
-
-
 
 const FilterModal = ({
   visible,
@@ -105,7 +102,10 @@ const FilterModal = ({
                     // Allow valid decimal input
                     if (text === '' || /^\d*\.?\d*$/.test(text)) {
                       const value = text === '' ? undefined : Number(text);
-                      setFilters((prev) => ({ ...prev, minStake: value }));
+                      setFilters((prev: ChallengeFilters) => ({
+                        ...prev,
+                        minStake: value,
+                      }));
                     }
                   }}
                 />
@@ -125,7 +125,10 @@ const FilterModal = ({
                     // Allow valid decimal input
                     if (text === '' || /^\d*\.?\d*$/.test(text)) {
                       const value = text === '' ? undefined : Number(text);
-                      setFilters((prev) => ({ ...prev, maxStake: value }));
+                      setFilters((prev: ChallengeFilters) => ({
+                        ...prev,
+                        maxStake: value,
+                      }));
                     }
                   }}
                 />
@@ -143,7 +146,10 @@ const FilterModal = ({
                   value={filters.minGoal ? String(filters.minGoal) : ''}
                   onChangeText={(text) => {
                     const value = text === '' ? undefined : parseInt(text);
-                    setFilters((prev) => ({ ...prev, minGoal: value }));
+                    setFilters((prev: ChallengeFilters) => ({
+                      ...prev,
+                      minGoal: value,
+                    }));
                   }}
                 />
               </View>
@@ -156,7 +162,10 @@ const FilterModal = ({
                   value={filters.maxGoal ? String(filters.maxGoal) : ''}
                   onChangeText={(text) => {
                     const value = text === '' ? undefined : parseInt(text);
-                    setFilters((prev) => ({ ...prev, maxGoal: value }));
+                    setFilters((prev: ChallengeFilters) => ({
+                      ...prev,
+                      maxGoal: value,
+                    }));
                   }}
                 />
               </View>
@@ -177,7 +186,10 @@ const FilterModal = ({
                   }
                   onChangeText={(text) => {
                     const value = text === '' ? undefined : parseInt(text);
-                    setFilters((prev) => ({ ...prev, minParticipants: value }));
+                    setFilters((prev: ChallengeFilters) => ({
+                      ...prev,
+                      minParticipants: value,
+                    }));
                   }}
                 />
               </View>
@@ -194,7 +206,10 @@ const FilterModal = ({
                   }
                   onChangeText={(text) => {
                     const value = text === '' ? undefined : parseInt(text);
-                    setFilters((prev) => ({ ...prev, maxParticipants: value }));
+                    setFilters((prev: ChallengeFilters) => ({
+                      ...prev,
+                      maxParticipants: value,
+                    }));
                   }}
                 />
               </View>

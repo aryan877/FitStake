@@ -57,6 +57,27 @@ export interface ChallengeData {
 }
 
 /**
+ * User-specific challenge data structure
+ */
+export interface UserChallenge {
+  id: string;
+  title: string;
+  description: string;
+  type: 'STEPS';
+  goal: {
+    value: number;
+    unit: string;
+  };
+  startTime: number;
+  endTime: number;
+  stakeAmount: number;
+  token: string;
+  progress: number;
+  completed: boolean;
+  claimed: boolean;
+}
+
+/**
  * Challenge progress tracking
  */
 export interface ChallengeProgress {

@@ -12,8 +12,9 @@ import {
   Text,
   View,
 } from 'react-native';
-import { ChallengeFilters, useChallenges } from '../../hooks/useChallenges';
+import { useChallenges } from '../../hooks/useChallenges';
 import { useSolanaWallet } from '../../hooks/useSolanaWallet';
+import { ChallengeFilters } from '../../types/challenge';
 import ActiveFilters from '../components/ActiveFilters';
 import ChallengeCard from '../components/ChallengeCard';
 import CreateChallengeModal from '../components/CreateChallengeModal';

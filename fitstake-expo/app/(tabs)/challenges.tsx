@@ -1,3 +1,4 @@
+import { UserChallenge } from '@/types';
 import { usePrivy } from '@privy-io/expo';
 import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { useRouter } from 'expo-router';
@@ -18,18 +19,8 @@ import { challengeApi } from '../services/api';
 import theme from '../theme';
 import { formatCountdown } from '../utils/dateFormatting';
 import { showErrorToast } from '../utils/errorHandling';
-import { UserChallenge } from '../types';
 
 const { colors, spacing, borderRadius, fontSize, fontWeight, shadows } = theme;
-
-;
-  stakeAmount: number;
-  token: string;
-  endTime: number;
-  progress: number;
-  completed: boolean;
-  claimed: boolean;
-}
 
 export default function MyChallengesScreen() {
   const { user } = usePrivy();

@@ -46,9 +46,10 @@ export interface CreateChallengeCardProps {
  * Filter button component props
  */
 export interface FilterButtonProps {
-  label: string;
+  text: string;
+  icon: React.ReactNode;
+  primary?: boolean;
   onPress: () => void;
-  badge?: number;
 }
 
 /**
@@ -83,6 +84,7 @@ export interface ChallengeCardProps {
 export interface OnboardingModalProps {
   visible: boolean;
   onClose: () => void;
+  onComplete: () => void;
 }
 
 /**
@@ -92,7 +94,9 @@ export interface FilterModalProps {
   visible: boolean;
   onClose: () => void;
   filters: any;
-  onApplyFilters: (filters: any) => void;
+  onApply: () => void;
+  onClearFilters: () => void;
+  setFilters: (filters: any) => void;
 }
 
 /**
@@ -128,6 +132,8 @@ export interface AvatarProps {
   size?: number;
   uri?: string;
   walletAddress?: string;
+  user?: any;
+  name?: string;
 }
 
 /**

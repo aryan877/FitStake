@@ -10,9 +10,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { OnboardingModalProps } from '../../types';
 import { authApi } from '../services/api';
 import theme from '../theme';
-import { OnboardingModalProps } from '../../types';
 
 const { colors, fontSize, fontWeight, spacing } = theme;
 
@@ -22,10 +22,9 @@ type OnboardingStep =
   | 'username-setup'
   | 'completed';
 
-
-
 const OnboardingModal: React.FC<OnboardingModalProps> = ({
   visible,
+  onClose,
   onComplete,
 }) => {
   const [currentStep, setCurrentStep] =
