@@ -63,3 +63,12 @@ export const showErrorToast = (
 export const showSuccessToast = (message: string) => {
   showToastSuccess(message);
 };
+
+// Add default export
+const errorHandling = {
+  handleApiError,
+  showErrorToast,
+  showSuccessToast,
+};
+
+export default errorHandling;

@@ -1,5 +1,4 @@
 import { getAccessToken } from '@privy-io/expo';
-import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 import axios from 'axios';
 import { StepsData } from '../../types';
 
@@ -87,6 +86,20 @@ export const authApi = {
   },
 };
 
+// Admin endpoints
+export const adminApi = {
+  // Check if user is an admin
+  checkAdminStatus: async () => {
+    try {
+      const response = await api.get('/admin/check-status');
+      return response.data;
+    } catch (error) {
+      console.error('Error checking admin status:', error);
+      return { success: false, data: { isAdmin: false } };
+    }
+  },
+};
+
 // Challenge endpoints
 export const challengeApi = {
   // Get all challenges with pagination and filters
@@ -104,13 +117,31 @@ export const challengeApi = {
       maxParticipants?: number;
       sortBy?: string;
       sortOrder?: 'asc' | 'desc';
+      searchText?: string;
+      visibility?: string;
+      challengeId?: string;
     } = {}
   ) => {
     try {
       const cleanParams: Record<string, any> = {};
 
-      // Copy string/simple params directly
-      ['page', 'limit', 'type', 'status', 'sortBy', 'sortOrder'].forEach(
+      // Handle search text (includes challenge ID, title, and description)
+      if (params.searchText?.trim()) {
+        cleanParams.searchText = params.searchText.trim();
+      }
+
+      // Handle status - make sure 'any' is not sent to backend
+      if (params.status && params.status !== 'any') {
+        cleanParams.status = params.status;
+      }
+
+      // Handle visibility - make sure valid values are sent
+      if (params.visibility) {
+        cleanParams.visibility = params.visibility;
+      }
+
+      // Copy pagination and sorting params
+      ['page', 'limit', 'sortBy', 'sortOrder', 'challengeId', 'type'].forEach(
         (key) => {
           if (params[key as keyof typeof params] !== undefined) {
             cleanParams[key] = params[key as keyof typeof params];
@@ -118,32 +149,57 @@ export const challengeApi = {
         }
       );
 
-      // Handle SOL to lamports conversion
-      ['minStake', 'maxStake'].forEach((key) => {
-        const value = params[key as keyof typeof params];
-        if (value !== undefined) {
-          const numValue = Number(value);
-          if (!isNaN(numValue)) {
-            cleanParams[key] = Math.floor(numValue * LAMPORTS_PER_SOL);
-          }
-        }
-      });
-
-      // Handle numeric values
+      // Handle numeric values with validation
+      // All min/max values should be positive numbers
       ['minGoal', 'maxGoal', 'minParticipants', 'maxParticipants'].forEach(
         (key) => {
           const value = params[key as keyof typeof params];
-          if (value !== undefined && !isNaN(Number(value))) {
+          if (
+            value !== undefined &&
+            value !== null &&
+            !isNaN(Number(value)) &&
+            Number(value) >= 0
+          ) {
             cleanParams[key] = Number(value);
           }
         }
       );
 
-      console.log('Clean params sent to server:', cleanParams);
+      // Special handling for stake amounts - convert from SOL to lamports
+      // The backend expects values in lamports (1 SOL = 1,000,000,000 lamports)
+      if (
+        params.minStake !== undefined &&
+        !isNaN(Number(params.minStake)) &&
+        Number(params.minStake) >= 0
+      ) {
+        const lamports = Math.floor(Number(params.minStake) * 1_000_000_000);
+        if (lamports > 0) {
+          cleanParams.minStake = lamports;
+        }
+      }
+
+      if (
+        params.maxStake !== undefined &&
+        !isNaN(Number(params.maxStake)) &&
+        Number(params.maxStake) >= 0
+      ) {
+        const lamports = Math.floor(Number(params.maxStake) * 1_000_000_000);
+        if (lamports > 0) {
+          cleanParams.maxStake = lamports;
+        }
+      }
+
+      console.log('API request params:', cleanParams);
       const response = await api.get('/challenges', { params: cleanParams });
+
+      if (!response.data?.success) {
+        throw new Error(response.data?.message || 'Failed to fetch challenges');
+      }
+
       return response.data;
-    } catch (error) {
-      throw error;
+    } catch (error: any) {
+      console.error('API Error - getAll challenges:', error);
+      throw new Error(error.response?.data?.message || error.message);
     }
   },
 
@@ -151,10 +207,15 @@ export const challengeApi = {
   getById: async (id: string) => {
     try {
       const response = await api.get(`/challenges/${id}`);
+
+      if (!response.data?.success) {
+        throw new Error(response.data?.message || 'Failed to fetch challenge');
+      }
+
       return response.data;
-    } catch (error) {
-      console.error(`Error fetching challenge ${id}:`, error);
-      throw error;
+    } catch (error: any) {
+      console.error(`API Error - getById challenge ${id}:`, error);
+      throw new Error(error.response?.data?.message || error.message);
     }
   },
 
@@ -167,36 +228,43 @@ export const challengeApi = {
     } = {}
   ) => {
     try {
-      // Create a clean copy of params
       const cleanParams: Record<string, any> = {};
 
-      // Handle pagination and text params
+      // Handle pagination and status params
       if (params.page !== undefined) cleanParams.page = params.page;
       if (params.limit !== undefined) cleanParams.limit = params.limit;
       if (params.status !== undefined) cleanParams.status = params.status;
 
-      console.log(
-        'Clean params sent to server for user challenges:',
-        cleanParams
-      );
       const response = await api.get('/challenges/user/challenges', {
         params: cleanParams,
       });
+
+      if (!response.data?.success) {
+        throw new Error(
+          response.data?.message || 'Failed to fetch user challenges'
+        );
+      }
+
       return response.data;
-    } catch (error) {
-      console.error('Error fetching user challenges:', error);
-      throw error;
+    } catch (error: any) {
+      console.error('API Error - getUserChallenges:', error);
+      throw new Error(error.response?.data?.message || error.message);
     }
   },
 
-  // Create a new challenge from smart contract data
+  // Create a new challenge
   createChallenge: async (data: any) => {
     try {
       const response = await api.post('/challenges', data);
+
+      if (!response.data?.success) {
+        throw new Error(response.data?.message || 'Failed to create challenge');
+      }
+
       return response.data;
-    } catch (error) {
-      console.error('Error creating challenge:', error);
-      throw error;
+    } catch (error: any) {
+      console.error('API Error - createChallenge:', error);
+      throw new Error(error.response?.data?.message || error.message);
     }
   },
 
@@ -204,28 +272,40 @@ export const challengeApi = {
   joinChallenge: async (id: string) => {
     try {
       const response = await api.post(`/challenges/${id}/join`);
+
+      if (!response.data?.success) {
+        throw new Error(response.data?.message || 'Failed to join challenge');
+      }
+
       return response.data;
-    } catch (error) {
-      console.error(`Error joining challenge ${id}:`, error);
-      throw error;
+    } catch (error: any) {
+      console.error(`API Error - joinChallenge ${id}:`, error);
+      throw new Error(error.response?.data?.message || error.message);
     }
   },
 
   // Submit health data for a challenge
   submitHealthData: async (
     id: string,
-    data: StepsData[],
+    healthData: StepsData[],
     targetSteps: number
   ) => {
     try {
-      // Send health data with verification metadata to the backend
       const response = await api.post(`/health/challenges/${id}/health-data`, {
-        healthData: data,
+        healthData,
+        targetSteps,
       });
+
+      if (!response.data?.success) {
+        throw new Error(
+          response.data?.message || 'Failed to submit health data'
+        );
+      }
+
       return response.data;
-    } catch (error) {
-      console.error(`Error submitting health data for challenge ${id}:`, error);
-      throw error;
+    } catch (error: any) {
+      console.error(`API Error - submitHealthData for challenge ${id}:`, error);
+      throw new Error(error.response?.data?.message || error.message);
     }
   },
 
@@ -235,10 +315,15 @@ export const challengeApi = {
       const response = await api.post(`/health/challenges/${id}/claim`, {
         transactionId,
       });
+
+      if (!response.data?.success) {
+        throw new Error(response.data?.message || 'Failed to claim reward');
+      }
+
       return response.data;
-    } catch (error) {
-      console.error(`Error claiming reward for challenge ${id}:`, error);
-      throw error;
+    } catch (error: any) {
+      console.error(`API Error - claimReward for challenge ${id}:`, error);
+      throw new Error(error.response?.data?.message || error.message);
     }
   },
 

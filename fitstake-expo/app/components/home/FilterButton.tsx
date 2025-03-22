@@ -1,11 +1,9 @@
+import theme from '@/app/theme';
+import { FilterButtonProps } from '@/types';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity } from 'react-native';
-import theme from '../theme';
-import { FilterButtonProps } from '../../types';
 
 const { colors, spacing, borderRadius, fontSize, fontWeight } = theme;
-
-
 
 const FilterButton = ({
   onPress,

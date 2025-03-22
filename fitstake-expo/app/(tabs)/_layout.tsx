@@ -2,12 +2,10 @@ import { Tabs } from 'expo-router';
 import { Activity, Trophy, User, Wallet } from 'lucide-react-native';
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import theme from '../theme';
 import { TabBarIconProps } from '../../types';
+import theme from '../theme';
 
 const { colors } = theme;
-
-
 
 export default function TabLayout() {
   return (

@@ -53,6 +53,9 @@ export default function WalletScreen() {
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState('');
 
+  // Refresh balance state
+  const [isRefreshingBalance, setIsRefreshingBalance] = useState(false);
+
   // Format balance with 4 decimal places
   const formattedBalance = balance !== null ? balance.toFixed(4) : '0.0000';
 
@@ -151,9 +154,57 @@ export default function WalletScreen() {
     Linking.openURL('https://faucet.solana.com');
   };
 
+  // Only refresh the wallet balance
+  const handleRefreshBalance = async () => {
+    setIsRefreshingBalance(true);
+    try {
+      await fetchWalletInfo();
+    } catch (error) {
+      console.error('Error refreshing balance:', error);
+    } finally {
+      setIsRefreshingBalance(false);
+    }
+  };
+
+  // Refresh transactions only
+  const [isRefreshingTx, setIsRefreshingTx] = useState(false);
+
+  const handleRefreshTransactions = async () => {
+    if (!connection || connectionStatus !== 'ready') return;
+
+    setIsRefreshingTx(true);
+    try {
+      await fetchRecentTransactions();
+    } catch (error) {
+      console.error('Error refreshing transactions:', error);
+    } finally {
+      setIsRefreshingTx(false);
+    }
+  };
+
+  // Refresh both balance and transactions
+  const handleRefreshAll = async () => {
+    setIsRefreshingBalance(true);
+    setIsRefreshingTx(true);
+
+    try {
+      await Promise.all([
+        fetchWalletInfo(),
+        connection && connectionStatus === 'ready'
+          ? fetchRecentTransactions()
+          : Promise.resolve(),
+      ]);
+    } catch (error) {
+      console.error('Error refreshing wallet data:', error);
+    } finally {
+      setIsRefreshingBalance(false);
+      setIsRefreshingTx(false);
+    }
+  };
+
   // Show loading indicator if connection is not ready
   if (
-    isLoading ||
+    (isLoading && !isRefreshingBalance) ||
     connectionStatus === 'initializing' ||
     connectionStatus === 'uninitialized'
   ) {
@@ -185,13 +236,6 @@ export default function WalletScreen() {
       </View>
     );
   }
-
-  const handleRefresh = () => {
-    fetchWalletInfo();
-    if (connection && connectionStatus === 'ready') {
-      fetchRecentTransactions();
-    }
-  };
 
   return (
     <View style={styles.container}>
@@ -240,10 +284,18 @@ export default function WalletScreen() {
         <View style={styles.balanceCard}>
           <Wallet color={colors.white} size={32} />
           <Text style={styles.balanceLabel}>Available Balance</Text>
-          <Text style={styles.balanceAmount}>{formattedBalance} SOL</Text>
+          {isRefreshingBalance ? (
+            <View style={styles.balanceLoadingContainer}>
+              <ActivityIndicator size="large" color={colors.accent.primary} />
+              <Text style={styles.balanceLoadingText}>Updating balance...</Text>
+            </View>
+          ) : (
+            <Text style={styles.balanceAmount}>{formattedBalance} SOL</Text>
+          )}
           <TouchableOpacity
             style={styles.refreshButton}
-            onPress={handleRefresh}
+            onPress={handleRefreshBalance}
+            disabled={isRefreshingBalance}
           >
             <Text style={styles.refreshButtonText}>Refresh</Text>
           </TouchableOpacity>
@@ -251,7 +303,11 @@ export default function WalletScreen() {
             <Pressable
               style={styles.actionButton}
               onPress={() => setSendModalVisible(true)}
-              disabled={!connection || connectionStatus !== 'ready'}
+              disabled={
+                !connection ||
+                connectionStatus !== 'ready' ||
+                isRefreshingBalance
+              }
             >
               <Text style={styles.buttonText}>Send</Text>
             </Pressable>
@@ -260,47 +316,72 @@ export default function WalletScreen() {
 
         <Text style={styles.sectionTitle}>Recent Transactions</Text>
         <View style={styles.transactionsList}>
-          {isLoadingTx ? (
+          <View style={styles.transactionsHeader}>
+            <Text style={styles.sectionSubtitle}>Transaction History</Text>
+            <TouchableOpacity
+              style={styles.refreshTxButton}
+              onPress={handleRefreshTransactions}
+            >
+              {isRefreshingTx ? (
+                <ActivityIndicator size="small" color={colors.accent.primary} />
+              ) : (
+                <Text style={styles.refreshButtonText}>Refresh</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          {isLoadingTx && !isRefreshingTx ? (
             <ActivityIndicator
               size="small"
               color={colors.accent.primary}
               style={styles.transactionsLoader}
             />
           ) : transactions.length > 0 ? (
-            transactions.map((tx, index) => (
-              <View key={index} style={styles.transactionItem}>
-                <View style={styles.transactionIcon}>
-                  {tx.isReceived ? (
-                    <ArrowDownLeft color={colors.accent.secondary} size={20} />
-                  ) : (
-                    <ArrowUpRight color={colors.accent.error} size={20} />
-                  )}
-                </View>
-                <View style={styles.transactionInfo}>
-                  <Text style={styles.transactionTitle}>
-                    {tx.isReceived ? 'Received' : 'Sent'}
+            <>
+              {transactions.map((tx, index) => (
+                <View key={index} style={styles.transactionItem}>
+                  <View style={styles.transactionIcon}>
+                    {tx.isReceived ? (
+                      <ArrowDownLeft
+                        color={colors.accent.secondary}
+                        size={20}
+                      />
+                    ) : (
+                      <ArrowUpRight color={colors.accent.error} size={20} />
+                    )}
+                  </View>
+                  <View style={styles.transactionInfo}>
+                    <Text style={styles.transactionTitle}>
+                      {tx.isReceived ? 'Received' : 'Sent'}
+                    </Text>
+                    <Text style={styles.transactionDate}>
+                      {formatDate(tx.timestamp)}
+                    </Text>
+                  </View>
+                  <Text
+                    style={[
+                      styles.transactionAmount,
+                      tx.isReceived ? styles.positive : styles.negative,
+                    ]}
+                  >
+                    {tx.isReceived ? '+' : '-'}
+                    {formatSol(tx.amount)}
                   </Text>
-                  <Text style={styles.transactionDate}>
-                    {formatDate(tx.timestamp)}
-                  </Text>
                 </View>
-                <Text
-                  style={[
-                    styles.transactionAmount,
-                    tx.isReceived ? styles.positive : styles.negative,
-                  ]}
-                >
-                  {tx.isReceived ? '+' : '-'}
-                  {formatSol(tx.amount)}
-                </Text>
-              </View>
-            ))
+              ))}
+            </>
           ) : (
             <View style={styles.emptyTransactionsContainer}>
               <Send color={colors.gray[600]} size={32} />
               <Text style={styles.emptyTransactionsText}>
                 No transactions found
               </Text>
+              <TouchableOpacity
+                style={styles.emptyStateRefreshButton}
+                onPress={handleRefreshTransactions}
+              >
+                <Text style={styles.refreshButtonText}>Refresh</Text>
+              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -566,6 +647,20 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     alignSelf: 'center',
   },
+  transactionsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
+  },
+  sectionSubtitle: {
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.medium,
+    color: colors.white,
+  },
+  refreshTxButton: {
+    padding: spacing.xs,
+  },
   // Modal styles
   centeredView: {
     flex: 1,
@@ -632,5 +727,22 @@ const styles = StyleSheet.create({
     color: colors.accent.error,
     fontSize: fontSize.sm,
     marginBottom: spacing.md,
+  },
+  emptyStateRefreshButton: {
+    backgroundColor: colors.gray[800],
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    marginTop: spacing.sm,
+  },
+  balanceLoadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
+  },
+  balanceLoadingText: {
+    color: colors.accent.primary,
+    fontSize: fontSize.sm,
+    marginTop: spacing.sm,
   },
 });

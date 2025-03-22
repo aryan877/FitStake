@@ -1,3 +1,5 @@
+import theme from '@/app/theme';
+import { OnboardingModalProps } from '@/types';
 import { useEmbeddedSolanaWallet, usePrivy } from '@privy-io/expo';
 import React, { useEffect, useState } from 'react';
 import {
@@ -10,9 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { OnboardingModalProps } from '../../types';
 import { authApi } from '../services/api';
-import theme from '../theme';
 
 const { colors, fontSize, fontWeight, spacing } = theme;
 

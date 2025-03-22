@@ -5,6 +5,11 @@
 import { StepsData } from './health';
 
 /**
+ * Challenge visibility options
+ */
+export type ChallengeVisibility = 'public' | 'private' | 'all';
+
+/**
  * Parameters for creating a new challenge
  */
 export interface CreateChallengeParams {
@@ -16,13 +21,15 @@ export interface CreateChallengeParams {
   minParticipants: number;
   maxParticipants: number;
   goalSteps: number;
+  isPublic?: boolean; // Whether the challenge is public (only for admins)
 }
 
 /**
  * Challenge data structure
  */
 export interface ChallengeData {
-  id: string;
+  id: string; // MongoDB _id
+  challengeId: string; // Unique ID from smart contract
   solanaChallengePda: string;
   solanaVaultPda: string;
   authority: string;
@@ -44,6 +51,7 @@ export interface ChallengeData {
   token: string;
   isActive: boolean;
   isCompleted: boolean;
+  isPublic: boolean;
   participants: Array<{
     walletAddress: string;
     did?: string;
@@ -103,6 +111,8 @@ export interface ChallengeFilters {
   sortOrder?: 'asc' | 'desc';
   page?: number;
   limit?: number;
+  visibility?: ChallengeVisibility;
+  searchText?: string;
 }
 
 /**
@@ -115,7 +125,11 @@ export interface Participant {
   completed: boolean;
   claimed: boolean;
   joinedAt: Date;
-  healthData?: StepsData[];
+  healthData?: {
+    date: string;
+    steps: number;
+    lastUpdated: Date;
+  }[];
   progress?: number;
 }
 
@@ -123,20 +137,22 @@ export interface Participant {
  * Challenge details for display
  */
 export interface ChallengeDetails {
-  id: string;
+  id: string; // MongoDB _id
+  challengeId: string; // Unique ID from smart contract
   title: string;
   description: string;
-  type: string;
-  goal: number;
-  startDate: string;
-  endDate: string;
+  goal: {
+    value: number;
+    unit: string;
+  };
   stakeAmount: number;
+  token: string;
+  startTime: number;
+  endTime: number;
   participants: Participant[];
-  participantsCount: number;
-  totalPot: number;
+  participantCount: number;
+  maxParticipants: number;
   isActive: boolean;
   isCompleted: boolean;
-  userJoined: boolean;
-  userCompleted: boolean;
-  userProgress: number;
+  isPublic: boolean;
 }

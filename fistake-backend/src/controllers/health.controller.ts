@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import Challenge from "../models/challenge.model";
 import UserModel from "../models/user.model";
-import { BackendHealthData, FrontendHealthData } from "../types";
+import { AnomalyData, BackendHealthData, FrontendHealthData } from "../types";
 import ApiError from "../utils/ApiError";
 import ApiResponse from "../utils/ApiResponse";
 
@@ -105,13 +105,6 @@ export const submitHealthData = async (
     // Verification metrics
     let totalVerifiedRecords = 0;
     let totalSuspiciousRecords = 0;
-
-    // Define a type for anomalies
-    interface AnomalyData {
-      date: string;
-      steps: number;
-      anomalies: string[];
-    }
 
     let anomalies: AnomalyData[] = [];
 

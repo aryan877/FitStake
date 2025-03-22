@@ -68,16 +68,16 @@ export const formatCountdown = (timestamp: number): string => {
 export const formatDate = (timestamp: number | Date): string => {
   if (timestamp instanceof Date) {
     // If it's a Date object, convert to unix timestamp in seconds
-    return dayjs(timestamp).format('MMM D, YYYY');
+    return dayjs(timestamp).format('MMM D, YYYY, h:mm A');
   }
 
   // If it's a unix timestamp in seconds (smaller than year 2100)
   if (timestamp < 4102444800) {
-    return dayjs.unix(timestamp).format('MMM D, YYYY');
+    return dayjs.unix(timestamp).format('MMM D, YYYY, h:mm A');
   }
 
   // Otherwise, assume it's in milliseconds
-  return dayjs(timestamp).format('MMM D, YYYY');
+  return dayjs(timestamp).format('MMM D, YYYY, h:mm A');
 };
 
 /**
@@ -88,3 +88,12 @@ export const formatDate = (timestamp: number | Date): string => {
 export const getRelativeTime = (timestamp: number): string => {
   return dayjs.unix(timestamp).fromNow();
 };
+
+// Add default export
+const dateFormatting = {
+  formatCountdown,
+  formatDate,
+  getRelativeTime,
+};
+
+export default dateFormatting;

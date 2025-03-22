@@ -61,6 +61,9 @@ export interface Challenge extends Document {
   // Timestamps
   createdAt: Date;
   updatedAt: Date;
+
+  // New field
+  isPublic: boolean;
 }
 
 const ChallengeSchema: Schema = new Schema(
@@ -166,6 +169,10 @@ const ChallengeSchema: Schema = new Schema(
       type: Boolean,
       default: false,
     },
+    isPublic: {
+      type: Boolean,
+      default: false,
+    },
 
     // Participants
     participants: [
@@ -251,13 +258,34 @@ ChallengeSchema.virtual("successRate").get(function (this: Challenge) {
 });
 
 // Index for efficient queries
-ChallengeSchema.index({ solanaChallengePda: 1 }, { unique: true });
 ChallengeSchema.index({ challengeId: 1 }, { unique: true });
-ChallengeSchema.index({ "participants.walletAddress": 1 });
-ChallengeSchema.index({ "participants.did": 1 });
-ChallengeSchema.index({ isActive: 1 });
-ChallengeSchema.index({ isCompleted: 1 });
-ChallengeSchema.index({ authority: 1 });
-ChallengeSchema.index({ endTime: 1, isCompleted: 1 }); // For finding ended challenges
+ChallengeSchema.index({ solanaChallengePda: 1 }, { unique: true });
+ChallengeSchema.index({ "participants.walletAddress": 1 }); // For user challenge lookups
+ChallengeSchema.index({ isCompleted: 1, startTime: 1 }); // For status + time based queries
+ChallengeSchema.index({ authority: 1 }); // For creator lookups
+
+// Compound index for sorting and filtering
+ChallengeSchema.index({
+  isCompleted: 1,
+  createdAt: -1,
+  type: 1,
+});
+
+// Text search index with weights
+ChallengeSchema.index(
+  {
+    challengeId: "text",
+    title: "text",
+    description: "text",
+  },
+  {
+    weights: {
+      challengeId: 10, // Highest priority for exact ID matches
+      title: 5, // Medium priority for title matches
+      description: 1, // Lower priority for description matches
+    },
+    name: "search_index",
+  }
+);
 
 export default mongoose.model<Challenge>("Challenge", ChallengeSchema);

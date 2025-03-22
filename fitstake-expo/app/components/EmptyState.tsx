@@ -1,7 +1,7 @@
+import theme from '@/app/theme';
+import { EmptyStateProps } from '@/types';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { EmptyStateProps } from '../../types';
-import theme from '../theme';
 
 const { colors, spacing, fontSize, borderRadius } = theme;
 

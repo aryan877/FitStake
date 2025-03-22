@@ -1,4 +1,6 @@
-import React from 'react';
+import theme from '@/app/theme';
+import { ChallengeFilters, FilterModalProps } from '@/types';
+import React, { useEffect, useState } from 'react';
 import {
   Modal,
   ScrollView,
@@ -8,8 +10,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { ChallengeFilters, FilterModalProps } from '../../types';
-import theme from '../theme';
 
 const { colors, spacing, borderRadius, fontSize, fontWeight } = theme;
 
@@ -21,6 +21,150 @@ const FilterModal = ({
   filters,
   setFilters,
 }: FilterModalProps) => {
+  // State to track input values as strings for better UX
+  const [minStakeInput, setMinStakeInput] = useState<string>(
+    filters.minStake !== undefined ? String(filters.minStake) : ''
+  );
+  const [maxStakeInput, setMaxStakeInput] = useState<string>(
+    filters.maxStake !== undefined ? String(filters.maxStake) : ''
+  );
+  const [minGoalInput, setMinGoalInput] = useState<string>(
+    filters.minGoal !== undefined ? String(filters.minGoal) : ''
+  );
+  const [maxGoalInput, setMaxGoalInput] = useState<string>(
+    filters.maxGoal !== undefined ? String(filters.maxGoal) : ''
+  );
+  const [minParticipantsInput, setMinParticipantsInput] = useState<string>(
+    filters.minParticipants !== undefined ? String(filters.minParticipants) : ''
+  );
+  const [maxParticipantsInput, setMaxParticipantsInput] = useState<string>(
+    filters.maxParticipants !== undefined ? String(filters.maxParticipants) : ''
+  );
+
+  // Update local state when filters change
+  useEffect(() => {
+    setMinStakeInput(
+      filters.minStake !== undefined ? String(filters.minStake) : ''
+    );
+    setMaxStakeInput(
+      filters.maxStake !== undefined ? String(filters.maxStake) : ''
+    );
+    setMinGoalInput(
+      filters.minGoal !== undefined ? String(filters.minGoal) : ''
+    );
+    setMaxGoalInput(
+      filters.maxGoal !== undefined ? String(filters.maxGoal) : ''
+    );
+    setMinParticipantsInput(
+      filters.minParticipants !== undefined
+        ? String(filters.minParticipants)
+        : ''
+    );
+    setMaxParticipantsInput(
+      filters.maxParticipants !== undefined
+        ? String(filters.maxParticipants)
+        : ''
+    );
+  }, [filters]);
+
+  // Handle applying filters with conversion from string to number
+  const handleApply = () => {
+    const updatedFilters = { ...filters };
+
+    // Convert string inputs to numbers when applying
+    if (minStakeInput === '') {
+      updatedFilters.minStake = undefined;
+    } else {
+      const minValue = parseFloat(minStakeInput);
+      if (!isNaN(minValue) && minValue >= 0) {
+        updatedFilters.minStake = minValue;
+      }
+    }
+
+    if (maxStakeInput === '') {
+      updatedFilters.maxStake = undefined;
+    } else {
+      const maxValue = parseFloat(maxStakeInput);
+      if (!isNaN(maxValue) && maxValue >= 0) {
+        updatedFilters.maxStake = maxValue;
+      }
+    }
+
+    // Handle Goal inputs
+    if (minGoalInput === '') {
+      updatedFilters.minGoal = undefined;
+    } else {
+      const minGoal = parseInt(minGoalInput);
+      if (!isNaN(minGoal) && minGoal >= 0) {
+        updatedFilters.minGoal = minGoal;
+      }
+    }
+
+    if (maxGoalInput === '') {
+      updatedFilters.maxGoal = undefined;
+    } else {
+      const maxGoal = parseInt(maxGoalInput);
+      if (!isNaN(maxGoal) && maxGoal >= 0) {
+        updatedFilters.maxGoal = maxGoal;
+      }
+    }
+
+    // Handle Participants inputs
+    if (minParticipantsInput === '') {
+      updatedFilters.minParticipants = undefined;
+    } else {
+      const minParticipants = parseInt(minParticipantsInput);
+      if (!isNaN(minParticipants) && minParticipants >= 0) {
+        updatedFilters.minParticipants = minParticipants;
+      }
+    }
+
+    if (maxParticipantsInput === '') {
+      updatedFilters.maxParticipants = undefined;
+    } else {
+      const maxParticipants = parseInt(maxParticipantsInput);
+      if (!isNaN(maxParticipants) && maxParticipants >= 0) {
+        updatedFilters.maxParticipants = maxParticipants;
+      }
+    }
+
+    setFilters(updatedFilters);
+    onApply();
+  };
+
+  // Handle clearing filters
+  const handleClearFilters = () => {
+    // Clear the local state inputs
+    setMinStakeInput('');
+    setMaxStakeInput('');
+    setMinGoalInput('');
+    setMaxGoalInput('');
+    setMinParticipantsInput('');
+    setMaxParticipantsInput('');
+
+    // Create a default filters object based on the current visibility
+    const defaultFilters: ChallengeFilters = {
+      status: 'active',
+      sortBy: 'createdAt',
+      sortOrder: 'desc',
+      visibility: filters.visibility, // Maintain current visibility setting
+      searchText: filters.searchText, // Maintain current search text
+      // Explicitly set numeric filters to undefined
+      minStake: undefined,
+      maxStake: undefined,
+      minGoal: undefined,
+      maxGoal: undefined,
+      minParticipants: undefined,
+      maxParticipants: undefined,
+    };
+
+    // Update filters state with default values
+    setFilters(defaultFilters);
+
+    // Call the parent onClearFilters function
+    onClearFilters();
+  };
+
   return (
     <Modal
       animationType="slide"
@@ -90,22 +234,14 @@ const FilterModal = ({
               <View style={styles.halfInput}>
                 <TextInput
                   style={styles.input}
-                  placeholder="Min Stake"
+                  placeholder="Min Stake (SOL)"
                   placeholderTextColor={colors.gray[500]}
                   keyboardType="decimal-pad"
-                  value={
-                    filters.minStake !== undefined
-                      ? String(filters.minStake)
-                      : ''
-                  }
+                  value={minStakeInput}
                   onChangeText={(text) => {
-                    // Allow valid decimal input
-                    if (text === '' || /^\d*\.?\d*$/.test(text)) {
-                      const value = text === '' ? undefined : Number(text);
-                      setFilters((prev: ChallengeFilters) => ({
-                        ...prev,
-                        minStake: value,
-                      }));
+                    // Allow valid decimal input including leading zeros
+                    if (text === '' || /^(0|[1-9]\d*)?\.?\d*$/.test(text)) {
+                      setMinStakeInput(text);
                     }
                   }}
                 />
@@ -113,22 +249,14 @@ const FilterModal = ({
               <View style={styles.halfInput}>
                 <TextInput
                   style={styles.input}
-                  placeholder="Max Stake"
+                  placeholder="Max Stake (SOL)"
                   placeholderTextColor={colors.gray[500]}
                   keyboardType="decimal-pad"
-                  value={
-                    filters.maxStake !== undefined
-                      ? String(filters.maxStake)
-                      : ''
-                  }
+                  value={maxStakeInput}
                   onChangeText={(text) => {
-                    // Allow valid decimal input
-                    if (text === '' || /^\d*\.?\d*$/.test(text)) {
-                      const value = text === '' ? undefined : Number(text);
-                      setFilters((prev: ChallengeFilters) => ({
-                        ...prev,
-                        maxStake: value,
-                      }));
+                    // Allow valid decimal input including leading zeros
+                    if (text === '' || /^(0|[1-9]\d*)?\.?\d*$/.test(text)) {
+                      setMaxStakeInput(text);
                     }
                   }}
                 />
@@ -143,13 +271,12 @@ const FilterModal = ({
                   placeholder="Min Goal"
                   placeholderTextColor={colors.gray[500]}
                   keyboardType="numeric"
-                  value={filters.minGoal ? String(filters.minGoal) : ''}
+                  value={minGoalInput}
                   onChangeText={(text) => {
-                    const value = text === '' ? undefined : parseInt(text);
-                    setFilters((prev: ChallengeFilters) => ({
-                      ...prev,
-                      minGoal: value,
-                    }));
+                    // Only allow positive numbers
+                    if (text === '' || /^\d*$/.test(text)) {
+                      setMinGoalInput(text);
+                    }
                   }}
                 />
               </View>
@@ -159,13 +286,12 @@ const FilterModal = ({
                   placeholder="Max Goal"
                   placeholderTextColor={colors.gray[500]}
                   keyboardType="numeric"
-                  value={filters.maxGoal ? String(filters.maxGoal) : ''}
+                  value={maxGoalInput}
                   onChangeText={(text) => {
-                    const value = text === '' ? undefined : parseInt(text);
-                    setFilters((prev: ChallengeFilters) => ({
-                      ...prev,
-                      maxGoal: value,
-                    }));
+                    // Only allow positive numbers
+                    if (text === '' || /^\d*$/.test(text)) {
+                      setMaxGoalInput(text);
+                    }
                   }}
                 />
               </View>
@@ -179,17 +305,12 @@ const FilterModal = ({
                   placeholder="Min Participants"
                   placeholderTextColor={colors.gray[500]}
                   keyboardType="numeric"
-                  value={
-                    filters.minParticipants
-                      ? String(filters.minParticipants)
-                      : ''
-                  }
+                  value={minParticipantsInput}
                   onChangeText={(text) => {
-                    const value = text === '' ? undefined : parseInt(text);
-                    setFilters((prev: ChallengeFilters) => ({
-                      ...prev,
-                      minParticipants: value,
-                    }));
+                    // Only allow positive numbers
+                    if (text === '' || /^\d*$/.test(text)) {
+                      setMinParticipantsInput(text);
+                    }
                   }}
                 />
               </View>
@@ -199,17 +320,12 @@ const FilterModal = ({
                   placeholder="Max Participants"
                   placeholderTextColor={colors.gray[500]}
                   keyboardType="numeric"
-                  value={
-                    filters.maxParticipants
-                      ? String(filters.maxParticipants)
-                      : ''
-                  }
+                  value={maxParticipantsInput}
                   onChangeText={(text) => {
-                    const value = text === '' ? undefined : parseInt(text);
-                    setFilters((prev: ChallengeFilters) => ({
-                      ...prev,
-                      maxParticipants: value,
-                    }));
+                    // Only allow positive numbers
+                    if (text === '' || /^\d*$/.test(text)) {
+                      setMaxParticipantsInput(text);
+                    }
                   }}
                 />
               </View>
@@ -311,7 +427,7 @@ const FilterModal = ({
           <View style={styles.modalButtonsContainer}>
             <TouchableOpacity
               style={styles.cancelButton}
-              onPress={onClearFilters}
+              onPress={handleClearFilters}
             >
               <Text style={styles.cancelButtonText}>Clear</Text>
             </TouchableOpacity>
@@ -320,7 +436,7 @@ const FilterModal = ({
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionButton} onPress={onApply}>
+            <TouchableOpacity style={styles.actionButton} onPress={handleApply}>
               <Text style={styles.actionButtonText}>Apply</Text>
             </TouchableOpacity>
           </View>

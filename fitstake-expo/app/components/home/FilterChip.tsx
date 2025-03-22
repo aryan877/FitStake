@@ -1,11 +1,9 @@
+import theme from '@/app/theme';
+import { FilterChipProps } from '@/types';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import theme from '../theme';
-import { FilterChipProps } from '../../types';
 
 const { colors, spacing, borderRadius, fontSize } = theme;
-
-
 
 const FilterChip = ({ label }: FilterChipProps) => {
   return (

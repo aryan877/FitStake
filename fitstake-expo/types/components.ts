@@ -107,10 +107,11 @@ export interface ChallengeFormData {
   description: string;
   stakeAmount: string;
   goalSteps: string;
-  startDate: Date;
-  endDate: Date;
+  startDate: Date | null;
+  endDate: Date | null;
   minParticipants: string;
   maxParticipants: string;
+  isPublic?: boolean;
 }
 
 /**

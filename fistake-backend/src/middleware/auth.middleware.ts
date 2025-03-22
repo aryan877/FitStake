@@ -1,14 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
-
-interface PrivyTokenPayload {
-  sid: string; // Session ID
-  sub: string; // User's Privy DID
-  iss: string; // Token issuer (should be privy.io)
-  aud: string; // Privy app ID
-  iat: number; // Timestamp when JWT was issued
-  exp: number; // Expiration timestamp
-}
+import { PrivyTokenPayload } from "../types";
 
 declare global {
   namespace Express {

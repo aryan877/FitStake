@@ -5,11 +5,12 @@ import express from "express";
 import helmet from "helmet";
 import mongoose from "mongoose";
 import morgan from "morgan";
-
 import { errorHandler, notFound } from "./middleware/error.middleware";
+import adminRoutes from "./routes/admin.routes";
 import authRoutes from "./routes/auth.routes";
 import challengeRoutes from "./routes/challenge.routes";
 import healthRoutes from "./routes/health.routes";
+import badgeService from "./services/badge.service";
 import cronService from "./services/cron.service";
 
 dotenv.config();
@@ -21,8 +22,8 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(
   cors({
-    origin: "*", // Allow all origins while testing with Expo Go
-    credentials: true, // Allow cookies to be sent with requests
+    origin: "*",
+    credentials: true,
   })
 );
 app.use(helmet());
@@ -32,6 +33,7 @@ app.use(morgan("dev"));
 app.use("/api/challenges", challengeRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/health", healthRoutes);
+app.use("/api/admin", adminRoutes);
 
 // Health check route
 app.get("/health", (req, res) => {
@@ -51,6 +53,10 @@ const connectDB = async () => {
       process.env.MONGODB_URI || "mongodb://localhost:27017/fitstake";
     await mongoose.connect(mongoURI);
     console.log("Connected to MongoDB");
+
+    // Initialize badges
+    await badgeService.initializeBadges();
+    console.log("Badges initialized");
 
     // Initialize cron jobs after successful DB connection
     cronService.initCronJobs();

@@ -1,7 +1,7 @@
+import theme from '@/app/theme';
+import { AvatarProps } from '@/types';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { AvatarProps } from '../../types';
-import theme from '../theme';
 
 const { colors } = theme;
 

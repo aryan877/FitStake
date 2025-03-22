@@ -4,6 +4,8 @@ import fs from "fs";
 import cron from "node-cron";
 import path from "path";
 import Challenge from "../models/challenge.model";
+import UserModel from "../models/user.model";
+import badgeService from "./badge.service";
 
 // Connection to Solana devnet
 const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
@@ -76,6 +78,9 @@ export const initCronJobs = () => {
   // Check for ended challenges and process them (runs every 30 seconds)
   cron.schedule("*/30 * * * * *", processEndedChallenges);
 
+  // Initialize badges
+  badgeService.initializeBadges();
+
   console.log("Cron jobs initialized");
 };
 
@@ -138,6 +143,85 @@ const processEndedChallenges = async () => {
             console.log(
               `Participant ${participant.walletAddress} completed the challenge with ${totalSteps} steps (goal: ${goal.value})`
             );
+
+            // Update user stats for completion
+            if (participant.did) {
+              const user = await UserModel.findOne({
+                privyId: participant.did,
+              });
+              if (user) {
+                console.log(`Updating stats for user ${user.username}`);
+
+                // Initialize stats if not exist
+                if (!user.stats) {
+                  user.stats = {
+                    totalStepCount: 0,
+                    challengesCompleted: 0,
+                    challengesJoined: 0,
+                    challengesCreated: 0,
+                    totalStaked: 0,
+                    totalEarned: 0,
+                    winRate: 0,
+                    lastUpdated: new Date(),
+                  };
+                }
+
+                // Update stats
+                const stepCount = totalSteps;
+                user.stats.totalStepCount =
+                  (user.stats.totalStepCount || 0) + stepCount;
+                user.stats.challengesCompleted =
+                  (user.stats.challengesCompleted || 0) + 1;
+                user.stats.totalEarned =
+                  (user.stats.totalEarned || 0) + challenge.stakeAmount;
+                user.stats.lastUpdated = new Date();
+
+                // Calculate win rate
+                if (user.stats.challengesJoined > 0) {
+                  user.stats.winRate =
+                    user.stats.challengesCompleted /
+                    user.stats.challengesJoined;
+                }
+
+                await user.save();
+
+                // Check for badges before update
+                const badgeCountBefore = user.badges?.length || 0;
+
+                // Check for new badges
+                if (user._id) {
+                  const newBadges = await badgeService.checkAndAwardBadges(
+                    user._id.toString()
+                  );
+
+                  // Print detailed badge information
+                  if (newBadges.length > 0) {
+                    console.log(
+                      `User ${user.username} awarded ${
+                        newBadges.length
+                      } new badges: ${newBadges.join(", ")}`
+                    );
+                    console.log(
+                      `Badge count: before=${badgeCountBefore}, after=${
+                        user.badges?.length || 0
+                      }`
+                    );
+                  } else {
+                    console.log(
+                      `No new badges awarded to user ${user.username}`
+                    );
+                  }
+                }
+
+                console.log(`Stats updated for user ${user.username}`);
+              } else {
+                console.log(`User not found for DID ${participant.did}`);
+              }
+            } else {
+              console.log(
+                `No DID associated with wallet ${participant.walletAddress}`
+              );
+            }
           } else {
             console.log(
               `Participant ${participant.walletAddress} failed the challenge with ${totalSteps}/${goal.value} steps`

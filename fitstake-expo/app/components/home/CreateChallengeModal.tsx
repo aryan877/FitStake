@@ -1,3 +1,5 @@
+import { CreateChallengeModalProps } from '@/types';
+import { usePrivy } from '@privy-io/expo';
 import DateTimePicker, {
   DateTimePickerEvent,
 } from '@react-native-community/datetimepicker';
@@ -8,13 +10,14 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { CreateChallengeModalProps } from '../../types/components';
-import theme from '../theme';
+import { authApi } from '../../services/api';
+import theme from '../../theme';
 
 const { colors, spacing, borderRadius, fontSize, fontWeight } = theme;
 
@@ -30,21 +33,48 @@ const CreateChallengeModal = ({
   challenge,
   onChange,
 }: CreateChallengeModalProps) => {
+  const { user } = usePrivy();
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
-  const [tempStartDate, setTempStartDate] = useState<Date>(challenge.startDate);
-  const [tempEndDate, setTempEndDate] = useState<Date>(challenge.endDate);
+  const [tempStartDate, setTempStartDate] = useState<Date | null>(
+    challenge.startDate || null
+  );
+  const [tempEndDate, setTempEndDate] = useState<Date | null>(
+    challenge.endDate || null
+  );
+
+  // Check if the user is an admin
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (user) {
+        try {
+          const profileResponse = await authApi.getUserProfile();
+          if (profileResponse.success && profileResponse.data) {
+            setIsAdmin(profileResponse.data.isAdmin || false);
+          }
+        } catch (error) {
+          console.error('Error checking admin status:', error);
+          setIsAdmin(false);
+        }
+      }
+    };
+
+    checkAdminStatus();
+  }, [user]);
 
   // Update temp dates when challenge dates change
   useEffect(() => {
-    setTempStartDate(challenge.startDate);
-    setTempEndDate(challenge.endDate);
+    setTempStartDate(challenge.startDate || null);
+    setTempEndDate(challenge.endDate || null);
   }, [challenge.startDate, challenge.endDate]);
 
   // Format date for display
-  const formatDate = (date: Date) => {
+  const formatDate = (date: Date | null) => {
+    if (!date) return 'Select date and time';
+
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -71,14 +101,17 @@ const CreateChallengeModal = ({
       setShowStartDatePicker(false);
 
       if (selectedDate && event.type === 'set') {
-        // Create a new date that combines the selected date with the current time
+        // Create a new date with the selected date
         const newDate = new Date(selectedDate);
-        newDate.setHours(
-          tempStartDate.getHours(),
-          tempStartDate.getMinutes(),
-          0,
-          0
-        );
+        // Set time to current time if no previous date
+        if (tempStartDate) {
+          newDate.setHours(
+            tempStartDate.getHours(),
+            tempStartDate.getMinutes(),
+            0,
+            0
+          );
+        }
         setTempStartDate(newDate);
 
         // Show the time picker next
@@ -100,7 +133,7 @@ const CreateChallengeModal = ({
   ) => {
     setShowStartTimePicker(false);
 
-    if (selectedTime && event.type === 'set') {
+    if (selectedTime && event.type === 'set' && tempStartDate) {
       // Create a new date that combines the current date with the selected time
       const newDate = new Date(tempStartDate);
       newDate.setHours(
@@ -113,8 +146,8 @@ const CreateChallengeModal = ({
       // Apply the final datetime
       onChange('startDate', newDate);
 
-      // If end date is before new start date, adjust it
-      if (challenge.endDate <= newDate) {
+      // If end date is before new start date or not set, adjust it
+      if (!challenge.endDate || challenge.endDate <= newDate) {
         const newEndDate = new Date(newDate);
         newEndDate.setHours(newEndDate.getHours() + 1);
         onChange('endDate', newEndDate);
@@ -130,14 +163,17 @@ const CreateChallengeModal = ({
       setShowEndDatePicker(false);
 
       if (selectedDate && event.type === 'set') {
-        // Create a new date that combines the selected date with the current time
+        // Create a new date with the selected date
         const newDate = new Date(selectedDate);
-        newDate.setHours(
-          tempEndDate.getHours(),
-          tempEndDate.getMinutes(),
-          0,
-          0
-        );
+        // Set time to current time if no previous date
+        if (tempEndDate) {
+          newDate.setHours(
+            tempEndDate.getHours(),
+            tempEndDate.getMinutes(),
+            0,
+            0
+          );
+        }
         setTempEndDate(newDate);
 
         // Show the time picker next
@@ -159,7 +195,7 @@ const CreateChallengeModal = ({
   ) => {
     setShowEndTimePicker(false);
 
-    if (selectedTime && event.type === 'set') {
+    if (selectedTime && event.type === 'set' && tempEndDate) {
       // Create a new date that combines the current date with the selected time
       const newDate = new Date(tempEndDate);
       newDate.setHours(
@@ -176,29 +212,38 @@ const CreateChallengeModal = ({
 
   const handleIOSStartDateConfirm = () => {
     setShowStartDatePicker(false);
-    onChange('startDate', tempStartDate);
+    if (tempStartDate) {
+      onChange('startDate', tempStartDate);
 
-    // If end date is before new start date, adjust it
-    if (challenge.endDate <= tempStartDate) {
-      const newEndDate = new Date(tempStartDate);
-      newEndDate.setDate(newEndDate.getDate() + 1);
-      onChange('endDate', newEndDate);
+      // If end date is before new start date or not set, adjust it
+      if (!challenge.endDate || challenge.endDate <= tempStartDate) {
+        const newEndDate = new Date(tempStartDate);
+        newEndDate.setDate(newEndDate.getDate() + 1);
+        onChange('endDate', newEndDate);
+      }
     }
   };
 
   const handleIOSEndDateConfirm = () => {
     setShowEndDatePicker(false);
-    onChange('endDate', tempEndDate);
+    if (tempEndDate) {
+      onChange('endDate', tempEndDate);
+    }
   };
 
   const handleIOSDateCancel = (isStartDate: boolean) => {
     if (isStartDate) {
       setShowStartDatePicker(false);
-      setTempStartDate(challenge.startDate); // Reset to original value
+      setTempStartDate(challenge.startDate || null); // Reset to original value
     } else {
       setShowEndDatePicker(false);
-      setTempEndDate(challenge.endDate); // Reset to original value
+      setTempEndDate(challenge.endDate || null); // Reset to original value
     }
+  };
+
+  // Handle public/private toggle for admin users
+  const handlePublicToggle = (value: boolean) => {
+    onChange('isPublic', value ? 'true' : 'false');
   };
 
   return (
@@ -245,6 +290,35 @@ const CreateChallengeModal = ({
               </Text>
             </View>
 
+            {/* Public/Private toggle for admin users */}
+            {isAdmin && (
+              <View style={styles.toggleContainer}>
+                <Text style={styles.inputLabel}>Make Challenge Public</Text>
+                <View style={styles.toggleRow}>
+                  <Text style={styles.toggleText}>
+                    {challenge.isPublic ? 'Public' : 'Private'}
+                  </Text>
+                  <Switch
+                    trackColor={{
+                      false: colors.gray[700],
+                      true: colors.accent.primary,
+                    }}
+                    thumbColor={
+                      challenge.isPublic ? colors.white : colors.gray[300]
+                    }
+                    ios_backgroundColor={colors.gray[700]}
+                    onValueChange={handlePublicToggle}
+                    value={!!challenge.isPublic}
+                  />
+                </View>
+                <Text style={styles.toggleHint}>
+                  {challenge.isPublic
+                    ? 'Public challenges are visible to all users'
+                    : 'Private challenges are only visible to those with the challenge ID'}
+                </Text>
+              </View>
+            )}
+
             <Text style={styles.inputLabel}>Stake Amount (SOL)</Text>
             <TextInput
               style={styles.input}
@@ -277,7 +351,9 @@ const CreateChallengeModal = ({
 
             {/* Date selection fields */}
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Start Date & Time</Text>
+              <Text style={styles.inputLabel}>
+                Start Date & Time<Text style={styles.requiredIndicator}>*</Text>
+              </Text>
               <TouchableOpacity
                 style={styles.dateInput}
                 onPress={() => {
@@ -289,7 +365,12 @@ const CreateChallengeModal = ({
                   }
                 }}
               >
-                <Text style={styles.dateText}>
+                <Text
+                  style={[
+                    styles.dateText,
+                    !challenge.startDate && styles.placeholderText,
+                  ]}
+                >
                   {formatDate(challenge.startDate)}
                 </Text>
               </TouchableOpacity>
@@ -299,7 +380,9 @@ const CreateChallengeModal = ({
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>End Date & Time</Text>
+              <Text style={styles.inputLabel}>
+                End Date & Time<Text style={styles.requiredIndicator}>*</Text>
+              </Text>
               <TouchableOpacity
                 style={styles.dateInput}
                 onPress={() => {
@@ -311,7 +394,12 @@ const CreateChallengeModal = ({
                   }
                 }}
               >
-                <Text style={styles.dateText}>
+                <Text
+                  style={[
+                    styles.dateText,
+                    !challenge.endDate && styles.placeholderText,
+                  ]}
+                >
                   {formatDate(challenge.endDate)}
                 </Text>
               </TouchableOpacity>
@@ -332,7 +420,7 @@ const CreateChallengeModal = ({
                   </TouchableOpacity>
                 </View>
                 <DateTimePicker
-                  value={tempStartDate}
+                  value={tempStartDate || new Date()}
                   mode="datetime"
                   display="spinner"
                   onChange={handleStartDateChange}
@@ -353,12 +441,14 @@ const CreateChallengeModal = ({
                   </TouchableOpacity>
                 </View>
                 <DateTimePicker
-                  value={tempEndDate}
+                  value={tempEndDate || new Date()}
                   mode="datetime"
                   display="spinner"
                   onChange={handleEndDateChange}
                   minimumDate={
-                    new Date(tempStartDate.getTime() + 60 * 60 * 1000)
+                    tempStartDate
+                      ? new Date(tempStartDate.getTime() + 60 * 60 * 1000)
+                      : new Date()
                   } // At least 1 hour after start
                   style={styles.dateTimePicker}
                 />
@@ -368,7 +458,7 @@ const CreateChallengeModal = ({
             {/* Android date and time pickers - shown natively and sequentially */}
             {Platform.OS === 'android' && showStartDatePicker && (
               <DateTimePicker
-                value={tempStartDate}
+                value={tempStartDate || new Date()}
                 mode="date"
                 onChange={handleStartDateChange}
                 minimumDate={new Date()}
@@ -377,7 +467,7 @@ const CreateChallengeModal = ({
 
             {Platform.OS === 'android' && showStartTimePicker && (
               <DateTimePicker
-                value={tempStartDate}
+                value={tempStartDate || new Date()}
                 mode="time"
                 onChange={handleStartTimeChange}
                 is24Hour={true}
@@ -386,16 +476,16 @@ const CreateChallengeModal = ({
 
             {Platform.OS === 'android' && showEndDatePicker && (
               <DateTimePicker
-                value={tempEndDate}
+                value={tempEndDate || new Date()}
                 mode="date"
                 onChange={handleEndDateChange}
-                minimumDate={new Date(tempStartDate.getTime())}
+                minimumDate={new Date(tempStartDate?.getTime() || 0)}
               />
             )}
 
             {Platform.OS === 'android' && showEndTimePicker && (
               <DateTimePicker
-                value={tempEndDate}
+                value={tempEndDate || new Date()}
                 mode="time"
                 onChange={handleEndTimeChange}
                 is24Hour={true}
@@ -516,6 +606,28 @@ const styles = StyleSheet.create({
     height: 100,
     textAlignVertical: 'top',
   },
+  toggleContainer: {
+    marginBottom: spacing.md,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: colors.gray[800],
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  toggleText: {
+    color: colors.white,
+    fontSize: fontSize.md,
+  },
+  toggleHint: {
+    fontSize: fontSize.xs,
+    color: colors.accent.secondary,
+    marginTop: 2,
+  },
   dateInput: {
     backgroundColor: colors.gray[800],
     borderRadius: borderRadius.md,
@@ -596,6 +708,14 @@ const styles = StyleSheet.create({
   },
   dateTimePicker: {
     height: 200,
+  },
+  requiredIndicator: {
+    color: colors.accent.error,
+    fontSize: fontSize.xs,
+    marginLeft: spacing.xs,
+  },
+  placeholderText: {
+    color: colors.gray[500],
   },
 });
 

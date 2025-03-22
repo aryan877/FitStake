@@ -6,6 +6,7 @@ import { challengeApi } from '../app/services/api';
 import {
   ChallengeData,
   ChallengeFilters,
+  ChallengeVisibility,
   CreateChallengeParams,
   StepsData,
 } from '../types';
@@ -50,12 +51,15 @@ export const useChallenges = () => {
   const [error, setError] = useState<string | null>(null);
   const [challenges, setChallenges] = useState<ChallengeData[]>([]);
   const [submittingData, setSubmittingData] = useState(false);
+
+  // Initialize with default filters
   const [filterParams, setFilterParams] = useState<ChallengeFilters>({
     status: 'active',
     sortBy: 'createdAt',
     sortOrder: 'desc',
     limit: 10,
     page: 1,
+    visibility: 'public' as ChallengeVisibility,
   });
 
   /**
@@ -91,35 +95,39 @@ export const useChallenges = () => {
       setLoading(true);
       setError(null);
 
-      // Update filters if provided
-      if (filters) {
-        setFilterParams((prevFilters) => ({
-          ...prevFilters,
-          ...filters,
-        }));
-      }
-
-      // Use current filters or the ones passed in
-      const queryParams = filters || filterParams;
-
       try {
-        const response = await challengeApi.getAll(queryParams);
-
-        if (response.success && response.data && response.data.challenges) {
-          setChallenges(response.data.challenges);
-        } else {
-          setChallenges([]);
+        // Update filters if provided
+        if (filters) {
+          setFilterParams((prevFilters) => ({
+            ...prevFilters,
+            ...filters,
+          }));
         }
 
-        setLoading(false);
-        return response.data?.challenges || [];
+        // Use current filters or the ones passed in
+        const queryParams = filters || filterParams;
+        console.log(
+          'Fetching challenges with filters:',
+          JSON.stringify(queryParams, null, 2)
+        );
+
+        const response = await challengeApi.getAll(queryParams);
+
+        if (response.success && response.data) {
+          const { challenges: fetchedChallenges, pagination } = response.data;
+          setChallenges(fetchedChallenges || []);
+          return fetchedChallenges;
+        } else {
+          setChallenges([]);
+          throw new Error(response.message || 'Failed to fetch challenges');
+        }
       } catch (err: any) {
         console.error('Error fetching challenges:', err);
-        setError(
-          `Failed to fetch challenges: ${err.message || 'Unknown error'}`
-        );
-        setLoading(false);
+        setError(err.message || 'Failed to fetch challenges');
+        setChallenges([]);
         return [];
+      } finally {
+        setLoading(false);
       }
     },
     [filterParams]
@@ -130,15 +138,59 @@ export const useChallenges = () => {
    */
   const updateFilters = useCallback(
     async (newFilters: Partial<ChallengeFilters>) => {
-      const updatedFilters = {
-        ...filterParams,
-        ...newFilters,
-        // Reset to page 1 when filters change
-        page: newFilters.page || 1,
-      };
+      // Create a copy of current filters
+      const updatedFilters = { ...filterParams };
 
+      // Update with new filter values, handling undefined properly
+      Object.keys(newFilters).forEach((key) => {
+        const typedKey = key as keyof ChallengeFilters;
+        const value = newFilters[typedKey];
+
+        // Only update if the value is different from current
+        if (value !== updatedFilters[typedKey]) {
+          if (value === undefined) {
+            // If the value is undefined, explicitly set to undefined
+            // to make sure we're not sending empty strings or invalid values
+            updatedFilters[typedKey] = undefined;
+          } else {
+            // Type-safe assignment for defined values
+            updatedFilters[typedKey] = value as any;
+          }
+        }
+      });
+
+      // Reset to page 1 when filters change, unless explicitly set
+      if (newFilters.page === undefined) {
+        updatedFilters.page = 1;
+      }
+
+      // Set the updated filters
       setFilterParams(updatedFilters);
-      return fetchChallenges(updatedFilters);
+
+      // Create API-friendly version of the filters
+      const apiFilters = { ...updatedFilters };
+
+      // Clean up filters before sending to API
+      // Don't send 'any' status to the backend
+      if (apiFilters.status === 'any') {
+        delete apiFilters.status;
+      }
+
+      // Don't send empty string search text
+      if (apiFilters.searchText === '') {
+        delete apiFilters.searchText;
+      }
+
+      // Log the filters being used
+      console.log('API filters:', JSON.stringify(apiFilters, null, 2));
+
+      try {
+        const result = await fetchChallenges(apiFilters);
+        return result;
+      } catch (error) {
+        console.error('Error fetching challenges with filters:', error);
+        throw error;
+      }
     },
     [filterParams, fetchChallenges]
   );
@@ -158,54 +210,33 @@ export const useChallenges = () => {
 
       try {
         // Generate a unique challenge ID (shorter to avoid size issues)
-        const timestamp = Math.floor(Date.now() / 1000); // Unix timestamp (seconds)
-        const random = Math.floor(Math.random() * 10000); // 4-digit random number
+        const timestamp = Math.floor(Date.now() / 1000);
+        const random = Math.floor(Math.random() * 10000);
         const challengeId = `c_${timestamp}_${random}`;
 
         // Get Anchor program
         const program = await getAnchorProgram();
 
-        // Prepare parameters for the smart contract
-        const stakeAmount = new BN(params.stakeAmount);
-        const startTime = new BN(params.startTime);
-        const endTime = new BN(params.endTime);
-        const minParticipants = params.minParticipants;
-        const maxParticipants = params.maxParticipants;
-
-        // Find the PDA for the challenge account
+        // Find PDAs and prepare transaction
         const [challengePda] = await PublicKey.findProgramAddressSync(
           [Buffer.from('challenge'), Buffer.from(challengeId)],
           program.programId
         );
 
-        // Find the PDA for the vault account
         const [vaultPda] = await PublicKey.findProgramAddressSync(
           [Buffer.from('vault'), challengePda.toBuffer()],
           program.programId
         );
 
-        // Log important details for debugging
-        console.log('Creating challenge with params:', {
-          challengeId,
-          stakeAmount: stakeAmount.toString(),
-          startTime: startTime.toString(),
-          endTime: endTime.toString(),
-          minParticipants,
-          maxParticipants,
-        });
-        console.log('Challenge PDA:', challengePda.toString());
-        console.log('Vault PDA:', vaultPda.toString());
-        console.log('User wallet:', walletAddress);
-
-        // Build the transaction with the proper account structure
+        // Build and send transaction
         const tx = await program.methods
           .createChallenge(
             challengeId,
-            stakeAmount,
-            startTime,
-            endTime,
-            minParticipants,
-            maxParticipants
+            new BN(params.stakeAmount),
+            new BN(params.startTime),
+            new BN(params.endTime),
+            params.minParticipants,
+            params.maxParticipants
           )
           .accounts({
             challenge: challengePda,
@@ -214,19 +245,14 @@ export const useChallenges = () => {
           })
           .transaction();
 
-        // Update transaction fee payer and recent blockhash
         tx.feePayer = new PublicKey(walletAddress);
 
-        // Send the transaction
         const result = await sendTransaction(tx);
         if (!result.success) {
-          console.error('Transaction error:', result.error);
           throw new Error(`Failed to send transaction: ${result.error}`);
         }
 
-        console.log('Transaction sent successfully:', result.signature);
-
-        // Create the challenge in the backend for indexing and UI
+        // Create challenge in backend
         const backendData = {
           challengeId,
           solanaChallengePda: challengePda.toString(),
@@ -243,27 +269,26 @@ export const useChallenges = () => {
           stakeAmount: params.stakeAmount,
           minParticipants: params.minParticipants,
           maxParticipants: params.maxParticipants,
-          token: 'SOL', // Always SOL
+          token: 'SOL',
           solanaTxId: result.signature,
+          isPublic: params.isPublic || false,
         };
 
-        // Submit to backend for indexing
         const response = await challengeApi.createChallenge(backendData);
 
-        if (response.success) {
-          fetchChallenges(); // Refresh the challenges list
-          setLoading(false);
+        if (response.success && response.data) {
           return response.data;
         } else {
-          throw new Error('Failed to create challenge in backend');
+          throw new Error(
+            response.message || 'Failed to create challenge in backend'
+          );
         }
       } catch (err: any) {
         console.error('Error creating challenge:', err);
-        setError(
-          `Failed to create challenge: ${err.message || 'Unknown error'}`
-        );
-        setLoading(false);
+        setError(err.message || 'Failed to create challenge');
         return null;
+      } finally {
+        setLoading(false);
       }
     },
     [authenticated, walletAddress, getAnchorProgram, sendTransaction]
@@ -282,85 +307,22 @@ export const useChallenges = () => {
       setError(null);
 
       try {
-        // Get challenge details from backend
-        const challengeResponse = await challengeApi.getById(challengeId);
-        const challenge = challengeResponse.data;
-
-        if (!challenge) {
-          throw new Error('Challenge not found');
-        }
-
-        console.log('Joining challenge:', challengeId);
-        console.log('Challenge data:', challenge);
-        console.log('User wallet:', walletAddress);
-
-        // Check if user is already a participant
-        const isAlreadyParticipant = challenge.participants.some(
-          (p: { walletAddress: string }) => p.walletAddress === walletAddress
-        );
-
-        if (isAlreadyParticipant) {
-          setError('You are already a participant in this challenge');
-          return false;
-        }
-
-        // Get Anchor program
-        const program = await getAnchorProgram();
-
-        // Get the challenge and vault PDAs
-        const challengePda = new PublicKey(challenge.solanaChallengePda);
-        const vaultPda = new PublicKey(challenge.solanaVaultPda);
-        const walletPubkey = new PublicKey(walletAddress);
-
-        // Find the PDA for the participant
-        const [participantPda] = await PublicKey.findProgramAddressSync(
-          [
-            Buffer.from('participant'),
-            challengePda.toBuffer(),
-            walletPubkey.toBuffer(),
-          ],
-          program.programId
-        );
-
-        console.log('Participant PDA:', participantPda.toString());
-        console.log('Challenge PDA:', challengePda.toString());
-        console.log('Vault PDA:', vaultPda.toString());
-
-        // Build the transaction
-        const tx = await program.methods
-          .joinChallenge()
-          .accounts({
-            challenge: challengePda,
-            participant: participantPda,
-            vault: vaultPda,
-            participantAuthority: walletPubkey,
-            systemProgram: SystemProgram.programId,
-          })
-          .transaction();
-
-        // Send the transaction
-        const result = await sendTransaction(tx);
-        if (!result.success) {
-          throw new Error(`Failed to send transaction: ${result.error}`);
-        }
-
-        console.log('Join transaction sent successfully:', result.signature);
-
-        // Update the backend
         const response = await challengeApi.joinChallenge(challengeId);
 
-        if (!response.success) {
-          throw new Error('Failed to update backend after joining challenge');
+        if (response.success) {
+          // Refresh challenges list after successful join
+          await fetchChallenges(filterParams);
+          return true;
+        } else {
+          throw new Error(response.message || 'Failed to join challenge');
         }
-
-        return true;
       } catch (err: any) {
         console.error('Error joining challenge:', err);
-        setError(`Failed to join challenge: ${err.message || 'Unknown error'}`);
+        setError(err.message || 'Failed to join challenge');
         return false;
       }
     },
-    [authenticated, walletAddress, getAnchorProgram, sendTransaction]
+    [authenticated, walletAddress, fetchChallenges, filterParams]
   );
 
   /**
@@ -375,17 +337,17 @@ export const useChallenges = () => {
     try {
       const response = await challengeApi.getById(challengeId);
 
-      setLoading(false);
       if (response.success && response.data) {
         return response.data;
       } else {
-        throw new Error('Challenge not found');
+        throw new Error(response.message || 'Challenge not found');
       }
     } catch (err: any) {
       console.error(`Error fetching challenge ${challengeId}:`, err);
-      setError(`Failed to fetch challenge: ${err.message || 'Unknown error'}`);
-      setLoading(false);
+      setError(err.message || 'Failed to fetch challenge');
       return null;
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -410,23 +372,18 @@ export const useChallenges = () => {
       setError(null);
 
       try {
-        // Submit enhanced health data to the backend
         const response = await challengeApi.submitHealthData(
           challengeId,
           healthData,
           targetSteps
         );
 
-        setSubmittingData(false);
-
-        if (response.success) {
-          // Calculate total steps for the UI
+        if (response.success && response.data) {
           const totalSteps = healthData.reduce(
             (sum, day) => sum + day.count,
             0
           );
 
-          // Calculate progress percentage
           const progressPercentage = Math.round(
             (totalSteps / targetSteps) * 100
           );
@@ -441,15 +398,14 @@ export const useChallenges = () => {
           throw new Error(response.message || 'Failed to submit health data');
         }
       } catch (err: any) {
-        console.error('Failed to submit health data for challenge:', err);
-        setError(
-          `Failed to submit health data: ${err.message || 'Unknown error'}`
-        );
-        setSubmittingData(false);
+        console.error('Failed to submit health data:', err);
+        setError(err.message || 'Failed to submit health data');
         return {
           success: false,
-          error: 'Failed to submit health data',
+          error: err.message || 'Failed to submit health data',
         };
+      } finally {
+        setSubmittingData(false);
       }
     },
     [authenticated]
@@ -469,33 +425,20 @@ export const useChallenges = () => {
       setError(null);
 
       try {
-        // Get challenge details from backend
+        // Get challenge details
         const challengeResponse = await challengeApi.getById(challengeId);
-        const challenge = challengeResponse.data;
-
-        if (!challenge) {
+        if (!challengeResponse.success || !challengeResponse.data) {
           throw new Error('Challenge not found');
         }
 
-        console.log('Claiming reward for challenge:', challengeId);
-        console.log('Challenge data:', challenge);
-        console.log('User wallet:', walletAddress);
+        const challenge = challengeResponse.data;
 
-        // Get Anchor program
+        // Get Anchor program and build transaction
         const program = await getAnchorProgram();
-
-        // Get the necessary PDAs and wallet
         const challengePda = new PublicKey(challenge.solanaChallengePda);
         const vaultPda = new PublicKey(challenge.solanaVaultPda);
         const walletPubkey = new PublicKey(walletAddress);
 
-        // Find the PDA for the completed list
-        const [completedListPda] = await PublicKey.findProgramAddressSync(
-          [Buffer.from('completed_list'), challengePda.toBuffer()],
-          program.programId
-        );
-
-        // Find the PDA for the participant account
         const [participantPda] = await PublicKey.findProgramAddressSync(
           [
             Buffer.from('participant'),
@@ -505,12 +448,11 @@ export const useChallenges = () => {
           program.programId
         );
 
-        console.log('Participant PDA:', participantPda.toString());
-        console.log('CompletedList PDA:', completedListPda.toString());
-        console.log('Challenge PDA:', challengePda.toString());
-        console.log('Vault PDA:', vaultPda.toString());
+        const [completedListPda] = await PublicKey.findProgramAddressSync(
+          [Buffer.from('completed_list'), challengePda.toBuffer()],
+          program.programId
+        );
 
-        // Build the transaction
         const tx = await program.methods
           .claimReward()
           .accounts({
@@ -523,39 +465,32 @@ export const useChallenges = () => {
           })
           .transaction();
 
-        // Send the transaction
         const result = await sendTransaction(tx);
         if (!result.success) {
           throw new Error(`Failed to send transaction: ${result.error}`);
         }
 
-        console.log(
-          'Claim reward transaction sent successfully:',
-          result.signature
-        );
-
-        // Update the backend with the transaction ID
-        const backendResponse = await challengeApi.claimReward(
+        // Update backend
+        const response = await challengeApi.claimReward(
           challengeId,
           result.signature || ''
         );
 
-        if (!backendResponse.success) {
-          console.warn(
-            'Backend update for claim was not successful, but funds were transferred.'
+        if (response.success) {
+          // Refresh challenges after successful claim
+          await fetchChallenges(filterParams);
+          return true;
+        } else {
+          throw new Error(
+            response.message || 'Failed to update backend after claiming'
           );
         }
-
-        // Refresh the challenges to update the UI
-        fetchChallenges();
-
-        setLoading(false);
-        return true;
       } catch (err: any) {
         console.error('Error claiming reward:', err);
-        setError(`Failed to claim reward: ${err.message || 'Unknown error'}`);
-        setLoading(false);
+        setError(err.message || 'Failed to claim reward');
         return false;
+      } finally {
+        setLoading(false);
       }
     },
     [
@@ -564,6 +499,7 @@ export const useChallenges = () => {
       getAnchorProgram,
       sendTransaction,
       fetchChallenges,
+      filterParams,
     ]
   );
 

@@ -1,10 +1,11 @@
+import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { NextFunction, Request, Response } from "express";
 import Challenge from "../models/challenge.model";
 import UserModel from "../models/user.model";
+import badgeService from "../services/badge.service";
 import ApiError from "../utils/ApiError";
 import ApiResponse from "../utils/ApiResponse";
 
-// Fetch challenges for display in the app
 export const getChallenges = async (
   req: Request,
   res: Response,
@@ -23,13 +24,97 @@ export const getChallenges = async (
       maxParticipants,
       sortBy = "createdAt",
       sortOrder = "desc",
-      status = "active", // active, completed, any
+      status,
+      searchText = "",
+      visibility = "public",
     } = req.query;
 
+    console.log("Search params:", req.query);
     const skip = (Number(page) - 1) * Number(limit);
 
+    // Determine sort direction
+    const sortDirection = sortOrder === "asc" ? 1 : -1;
+    const sortOptions: any = {};
+    sortOptions[sortBy as string] = sortDirection;
+
     // Build query based on filters
-    const query: any = {};
+    let query: any = {};
+
+    // Filter by visibility (public/private challenges)
+    if (visibility === "public") {
+      query.isPublic = true;
+    } else if (visibility === "private") {
+      query.isPublic = false;
+    } else if (visibility === "all") {
+      // Explicitly don't add any visibility filter
+      console.log("Searching across both public and private challenges");
+    }
+    // If visibility is not specified, don't add filter for isPublic
+
+    // Search text in title, description, and challengeId
+    if (searchText) {
+      const trimmedSearchText = String(searchText).trim();
+
+      // Only proceed with search if we have actual text after trimming
+      if (trimmedSearchText.length > 0) {
+        console.log(`Searching with text: "${trimmedSearchText}"`);
+
+        // First, try to find an exact match for challengeId
+        const exactMatch = await Challenge.findOne({
+          challengeId: trimmedSearchText,
+        });
+
+        if (exactMatch) {
+          // If exact match is found, override all other filters to return just this challenge
+          console.log(
+            `Found exact match for challengeId: ${trimmedSearchText}`
+          );
+
+          // Override the query to only search by this challengeId
+          // This ensures the challenge is found regardless of visibility settings
+          query = { challengeId: trimmedSearchText };
+
+          console.log(
+            `Found challenge: ${exactMatch.title} (${
+              exactMatch.isPublic ? "public" : "private"
+            })`
+          );
+        } else {
+          // No exact match by challengeId, try pattern matching
+          console.log(`No exact challengeId match for: "${trimmedSearchText}"`);
+
+          const searchRegex = new RegExp(trimmedSearchText, "i");
+
+          // Use regex to search across multiple fields
+          query.$or = [
+            { challengeId: { $regex: searchRegex } },
+            { title: { $regex: searchRegex } },
+            { description: { $regex: searchRegex } },
+          ];
+
+          // For multi-word searches, also try text search
+          if (
+            trimmedSearchText.includes(" ") &&
+            trimmedSearchText.length >= 3
+          ) {
+            console.log("Also using text search for multi-word query");
+            // We use $or to combine with the existing query
+            if (!query.$or) {
+              query.$or = [];
+            }
+
+            // Add text search as another condition
+            query.$or.push({ $text: { $search: trimmedSearchText } });
+
+            // Add relevance score for sorting
+            sortOptions.score = { $meta: "textScore" };
+          }
+        }
+      }
+    }
+
+    console.log("Final query:", JSON.stringify(query, null, 2));
+    console.log("Sort options:", JSON.stringify(sortOptions, null, 2));
 
     if (type) {
       query.type = type;
@@ -46,10 +131,20 @@ export const getChallenges = async (
     if (minStake || maxStake) {
       query.stakeAmount = {};
       if (minStake) {
-        query.stakeAmount.$gte = Number(minStake);
+        // Convert from SOL to lamports (1 SOL = 1,000,000,000 lamports)
+        const minStakeLamports = Number(minStake) * LAMPORTS_PER_SOL;
+        query.stakeAmount.$gte = minStakeLamports;
+        console.log(
+          `Converting minStake from ${minStake} SOL to ${minStakeLamports} lamports`
+        );
       }
       if (maxStake) {
-        query.stakeAmount.$lte = Number(maxStake);
+        // Convert from SOL to lamports (1 SOL = 1,000,000,000 lamports)
+        const maxStakeLamports = Number(maxStake) * LAMPORTS_PER_SOL;
+        query.stakeAmount.$lte = maxStakeLamports;
+        console.log(
+          `Converting maxStake from ${maxStake} SOL to ${maxStakeLamports} lamports`
+        );
       }
     }
 
@@ -75,11 +170,6 @@ export const getChallenges = async (
       }
     }
 
-    // Determine sort direction
-    const sortDirection = sortOrder === "asc" ? 1 : -1;
-    const sortOptions: any = {};
-    sortOptions[sortBy as string] = sortDirection;
-
     // Fetch challenges
     const challenges = await Challenge.find(query)
       .sort(sortOptions)
@@ -88,6 +178,10 @@ export const getChallenges = async (
 
     // Get total count for pagination
     const total = await Challenge.countDocuments(query);
+
+    console.log(
+      `Query returned ${challenges.length} results out of ${total} total matches`
+    );
 
     return res.status(200).json(
       new ApiResponse(
@@ -233,6 +327,7 @@ export const createChallenge = async (
       maxParticipants,
       token,
       solanaTxId,
+      isPublic = false,
     } = req.body;
 
     // Validate required fields
@@ -286,6 +381,16 @@ export const createChallenge = async (
       );
     }
 
+    // Check if attempting to create a public challenge
+    if (isPublic === true) {
+      // Only admins can create public challenges
+      if (!user.isAdmin) {
+        return next(
+          new ApiError(403, "Only administrators can create public challenges")
+        );
+      }
+    }
+
     // Create new challenge
     const challenge = new Challenge({
       challengeId,
@@ -310,9 +415,54 @@ export const createChallenge = async (
       participants: [],
       lastIndexedTransaction: solanaTxId,
       lastEventTimestamp: new Date(),
+      isPublic: isPublic,
     });
 
     await challenge.save();
+
+    // Update user stats for creating a challenge
+    if (user._id) {
+      // Initialize stats if they don't exist
+      if (!user.stats) {
+        user.stats = {
+          totalStepCount: 0,
+          challengesCompleted: 0,
+          challengesJoined: 0,
+          challengesCreated: 0,
+          totalStaked: 0,
+          totalEarned: 0,
+          winRate: 0,
+          lastUpdated: new Date(),
+        };
+      }
+
+      // Update stats
+      user.stats.challengesCreated = (user.stats.challengesCreated || 0) + 1;
+      user.stats.lastUpdated = new Date();
+
+      await user.save();
+
+      // Check badge count before
+      const badgeCountBefore = user.badges?.length || 0;
+
+      // Check for new badges
+      const newBadges = await badgeService.checkAndAwardBadges(
+        user._id.toString()
+      );
+
+      if (newBadges.length > 0) {
+        console.log(
+          `User ${user.username} awarded ${
+            newBadges.length
+          } new badges for creating challenge: ${newBadges.join(", ")}`
+        );
+        console.log(
+          `Badge count: before=${badgeCountBefore}, after=${
+            user.badges?.length || 0
+          }`
+        );
+      }
+    }
 
     return res
       .status(201)
@@ -394,6 +544,52 @@ export const joinChallenge = async (
     }
 
     await challenge.save();
+
+    // Update user stats for joining challenge
+    if (user._id) {
+      // Initialize stats if they don't exist
+      if (!user.stats) {
+        user.stats = {
+          totalStepCount: 0,
+          challengesCompleted: 0,
+          challengesJoined: 0,
+          challengesCreated: 0,
+          totalStaked: 0,
+          totalEarned: 0,
+          winRate: 0,
+          lastUpdated: new Date(),
+        };
+      }
+
+      // Update stats
+      user.stats.challengesJoined = (user.stats.challengesJoined || 0) + 1;
+      user.stats.totalStaked =
+        (user.stats.totalStaked || 0) + challenge.stakeAmount;
+      user.stats.lastUpdated = new Date();
+
+      await user.save();
+
+      // Check badge count before
+      const badgeCountBefore = user.badges?.length || 0;
+
+      // Check for new badges
+      const newBadges = await badgeService.checkAndAwardBadges(
+        user._id.toString()
+      );
+
+      if (newBadges.length > 0) {
+        console.log(
+          `User ${user.username} awarded ${
+            newBadges.length
+          } new badges for joining challenge: ${newBadges.join(", ")}`
+        );
+        console.log(
+          `Badge count: before=${badgeCountBefore}, after=${
+            user.badges?.length || 0
+          }`
+        );
+      }
+    }
 
     return res
       .status(200)

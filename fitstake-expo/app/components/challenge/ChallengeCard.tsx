@@ -1,17 +1,20 @@
+import theme from '@/app/theme';
+import { formatCountdown } from '@/app/utils/dateFormatting';
+import { ChallengeData } from '@/types';
 import { LAMPORTS_PER_SOL } from '@solana/web3.js';
+import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
-import { TrendingUp, Trophy, Users } from 'lucide-react-native';
+import { Copy, TrendingUp, Trophy, Users } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
+  ToastAndroid,
   View,
 } from 'react-native';
-import { ChallengeData } from '../../types/challenge';
-import theme from '../theme';
-import { formatCountdown } from '../utils/dateFormatting';
 
 const { colors, spacing, borderRadius, fontSize, fontWeight } = theme;
 
@@ -63,19 +66,46 @@ const ChallengeCard = ({
     router.push(`/challenge/${challenge.id}`);
   };
 
+  const handleCopyId = async (e: any) => {
+    e.stopPropagation();
+    try {
+      await Clipboard.setStringAsync(challenge.challengeId);
+      if (Platform.OS === 'android') {
+        ToastAndroid.show(
+          'Challenge ID copied to clipboard',
+          ToastAndroid.SHORT
+        );
+      } else {
+        console.log('Challenge ID copied to clipboard');
+      }
+    } catch (error) {
+      console.error('Failed to copy challenge ID:', error);
+    }
+  };
+
+  // Check if challenge is private
+  const isPrivate = challenge.isPublic === false;
+
   return (
     <Pressable style={styles.challengeCard} onPress={handleCardPress}>
       <View style={styles.challengeCardHeader}>
         <Text style={styles.challengeCardTitle}>{challenge.title}</Text>
-        {needsMoreParticipants && (
-          <View style={styles.needsParticipantsBadge}>
-            <Users size={10} color={colors.white} />
-            <Text style={styles.needsParticipantsText}>
-              Needs {challenge.minParticipants - challenge.participantCount}{' '}
-              more
-            </Text>
-          </View>
-        )}
+        <View style={styles.badgesContainer}>
+          {isPrivate && (
+            <View style={styles.privateBadge}>
+              <Text style={styles.privateBadgeText}>Private</Text>
+            </View>
+          )}
+          {needsMoreParticipants && (
+            <View style={styles.needsParticipantsBadge}>
+              <Users size={10} color={colors.white} />
+              <Text style={styles.needsParticipantsText}>
+                Needs {challenge.minParticipants - challenge.participantCount}{' '}
+                more
+              </Text>
+            </View>
+          )}
+        </View>
       </View>
 
       <Text style={styles.challengeCardDesc}>{trimmedDescription}</Text>
@@ -113,21 +143,34 @@ const ChallengeCard = ({
       <View style={styles.challengeCardFooter}>
         <Text style={styles.challengeCardEndDate}>{countdownText}</Text>
 
-        {isJoining ? (
-          <View style={styles.joinButton}>
-            <ActivityIndicator size="small" color={colors.white} />
-          </View>
-        ) : (
-          <Pressable
-            style={styles.joinButton}
-            onPress={(e) => {
-              e.stopPropagation(); // Prevent the card press event
-              onJoin(challenge.id);
-            }}
-          >
-            <Text style={styles.joinButtonText}>Join</Text>
-          </Pressable>
-        )}
+        <View style={styles.actionButtonsContainer}>
+          {isPrivate && (
+            <Pressable
+              style={styles.copyButton}
+              onPress={handleCopyId}
+              android_ripple={{ color: colors.gray[700] }}
+            >
+              <Copy size={14} color={colors.white} />
+              <Text style={styles.copyButtonText}>Copy ID</Text>
+            </Pressable>
+          )}
+
+          {isJoining ? (
+            <View style={styles.joinButton}>
+              <ActivityIndicator size="small" color={colors.white} />
+            </View>
+          ) : (
+            <Pressable
+              style={styles.joinButton}
+              onPress={(e) => {
+                e.stopPropagation(); // Prevent the card press event
+                onJoin(challenge.id);
+              }}
+            >
+              <Text style={styles.joinButtonText}>Join</Text>
+            </Pressable>
+          )}
+        </View>
       </View>
     </Pressable>
   );
@@ -183,6 +226,11 @@ const styles = StyleSheet.create({
     color: colors.accent.primary,
     fontWeight: fontWeight.medium,
   },
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
   joinButton: {
     backgroundColor: colors.accent.primary,
     paddingVertical: spacing.xs,
@@ -194,6 +242,20 @@ const styles = StyleSheet.create({
   joinButtonText: {
     color: colors.white,
     fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium,
+  },
+  copyButton: {
+    backgroundColor: colors.gray[700],
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  copyButtonText: {
+    color: colors.white,
+    fontSize: fontSize.xs,
     fontWeight: fontWeight.medium,
   },
   needsParticipantsBadge: {
@@ -216,6 +278,24 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
     marginBottom: spacing.sm,
     fontStyle: 'italic',
+  },
+  badgesContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  privateBadge: {
+    backgroundColor: colors.gray[700],
+    paddingVertical: 2,
+    paddingHorizontal: spacing.xs,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.gray[600],
+  },
+  privateBadgeText: {
+    color: colors.gray[300],
+    fontSize: 10,
+    fontWeight: fontWeight.medium,
   },
 });
 

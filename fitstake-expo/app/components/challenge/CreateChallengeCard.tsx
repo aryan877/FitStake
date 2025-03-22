@@ -1,12 +1,10 @@
+import theme from '@/app/theme';
+import { CreateChallengeCardProps } from '@/types';
 import { Plus, Trophy } from 'lucide-react-native';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import theme from '../theme';
-import { CreateChallengeCardProps } from '../../types';
 
 const { colors, spacing, borderRadius, fontSize, fontWeight } = theme;
-
-
 
 const CreateChallengeCard = ({ onPress }: CreateChallengeCardProps) => {
   return (

@@ -1,3 +1,5 @@
+import theme from '@/app/theme';
+import { ToastConfig } from '@/types';
 import { AlertCircle, CheckCircle, X } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -7,8 +9,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { ToastConfig } from '../../types';
-import theme from '../theme';
 
 const { colors, spacing, fontSize, fontWeight, borderRadius } = theme;
 

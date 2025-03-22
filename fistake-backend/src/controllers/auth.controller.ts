@@ -1,6 +1,8 @@
 import { NextFunction, Request, Response } from "express";
 import { v4 as uuidv4 } from "uuid";
+import BadgeModel from "../models/badge.model";
 import UserModel from "../models/user.model";
+import { BadgeWithDetails } from "../types";
 import ApiError from "../utils/ApiError";
 import ApiResponse from "../utils/ApiResponse";
 import { validateUsername } from "../utils/validators";
@@ -24,17 +26,72 @@ export const getUserProfile = async (
       return next(new ApiError(404, "User not found"));
     }
 
-    return res.status(200).json(
-      new ApiResponse(
-        200,
-        {
-          privyId: user.privyId,
-          walletAddress: user.walletAddress,
-          username: user.username,
-        },
-        "User profile retrieved successfully"
-      )
+    // Get badge details if user has badges
+    let badgesWithDetails: BadgeWithDetails[] = [];
+
+    if (user.badges && user.badges.length > 0) {
+      // Log badge information for debugging
+      console.log(
+        `User ${user.username} has ${user.badges.length} badges in database`
+      );
+
+      // Get all badge IDs
+      const badgeIds = user.badges.map((badge) => badge.badgeId);
+      console.log("Badge IDs for user:", badgeIds);
+
+      // Get badge details from badge model
+      const badgeDetails = await BadgeModel.find({ id: { $in: badgeIds } });
+      console.log(`Found ${badgeDetails.length} badge details from BadgeModel`);
+
+      // Map badges with their details
+      badgesWithDetails = user.badges.map((userBadge) => {
+        const badge = badgeDetails.find((b) => b.id === userBadge.badgeId);
+        if (!badge) {
+          console.log(
+            `Warning: Badge details not found for ID ${userBadge.badgeId}`
+          );
+        }
+        return {
+          id: userBadge.badgeId,
+          name: badge?.name || "Unknown Badge",
+          description: badge?.description || "",
+          iconName: badge?.iconName || "",
+          tier: badge?.tier || "bronze",
+          category: badge?.category || "challenges",
+          earnedAt: userBadge.earnedAt,
+        };
+      });
+    } else {
+      console.log(`User ${user.username} has no badges`);
+    }
+
+    // Construct the response
+    const profileData = {
+      privyId: user.privyId,
+      walletAddress: user.walletAddress,
+      username: user.username,
+      isAdmin: user.isAdmin || false,
+      stats: user.stats || {
+        totalStepCount: 0,
+        challengesCompleted: 0,
+        challengesJoined: 0,
+        challengesCreated: 0,
+        totalStaked: 0,
+        totalEarned: 0,
+        winRate: 0,
+      },
+      badges: badgesWithDetails,
+    };
+
+    console.log(
+      `Returning profile for ${user.username} with ${badgesWithDetails.length} badges`
     );
+
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(200, profileData, "User profile retrieved successfully")
+      );
   } catch (error) {
     console.error("Error fetching user profile:", error);
     return next(new ApiError(500, "Error fetching user profile"));
@@ -100,6 +157,17 @@ export const createOrUpdateUser = async (
         privyId: did,
         walletAddress,
         username: generatedUsername,
+        isAdmin: false, // Default to non-admin
+        stats: {
+          totalStepCount: 0,
+          challengesCompleted: 0,
+          challengesJoined: 0,
+          challengesCreated: 0,
+          totalStaked: 0,
+          totalEarned: 0,
+          winRate: 0,
+          lastUpdated: new Date(),
+        },
       });
     }
 
@@ -110,6 +178,9 @@ export const createOrUpdateUser = async (
           privyId: user.privyId,
           walletAddress: user.walletAddress,
           username: user.username,
+          isAdmin: user.isAdmin || false,
+          stats: user.stats,
+          badges: user.badges || [],
         },
         "User profile updated successfully"
       )

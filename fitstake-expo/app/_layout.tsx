@@ -111,11 +111,14 @@ function AppWithOnboarding() {
     router.replace('/(tabs)');
   };
 
+  const handleCloseOnboarding = () => {
+    setShowOnboarding(false);
+  };
+
   return (
     <>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="sign-in" />
-        <Stack.Screen name="(app)" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen
           name="+not-found"
@@ -128,6 +131,7 @@ function AppWithOnboarding() {
       <OnboardingModal
         visible={showOnboarding}
         onComplete={handleOnboardingComplete}
+        onClose={handleCloseOnboarding}
       />
     </>
   );

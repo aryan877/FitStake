@@ -8,6 +8,9 @@
     "scheme": "fitstake",
     "newArchEnabled": false,
     "assetBundlePatterns": ["**/*"],
+    "web": {
+      "bundler": "metro"
+    },
     "ios": {
       "usesAppleSignIn": true,
       "supportsTablet": true,
