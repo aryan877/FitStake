@@ -32,3 +32,9 @@ node_modules
 *.njsproj
 *.sln
 *.sw?
+
+# Private keypairs
+keypair.json
+*keypair.json
+*.keypair.json
+*-keypair.json

@@ -31,8 +31,9 @@ export interface Challenge extends Document {
   // Status flags (from smart contract)
   isActive: boolean;
   isCompleted: boolean;
+  onChainVerificationComplete: boolean;
 
-  // Participants (indexed from blockchain events)
+  // Participants
   participants: {
     walletAddress: string;
     did?: string; // Optional user DID if mapped in our system
@@ -158,6 +159,10 @@ const ChallengeSchema: Schema = new Schema(
       default: false,
     },
     isCompleted: {
+      type: Boolean,
+      default: false,
+    },
+    onChainVerificationComplete: {
       type: Boolean,
       default: false,
     },

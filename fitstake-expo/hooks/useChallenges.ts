@@ -6,7 +6,7 @@ import { challengeApi, StepsData } from '../app/services/api';
 import { useSolanaWallet } from './useSolanaWallet';
 
 // Import the IDL
-import IDL from '../src/idl/accountability.json';
+import IDL from '../idl/accountability.json';
 
 // Get RPC URL from environment variables or use devnet as fallback
 const SOLANA_RPC_URL =
@@ -14,7 +14,7 @@ const SOLANA_RPC_URL =
 
 // Accountability program ID
 const PROGRAM_ID = new PublicKey(
-  'Aky9S499wn2Je1h6DAkV3JWqszYK8LHa2uJkCjwHJnnQ'
+  '5hTA47XZPkJK7d6JrCEcmUaDbt6bgxNjgUDbRBo593er'
 );
 
 // Interface for challenge creation parameters
@@ -476,34 +476,35 @@ export const useChallenges = () => {
       setError(null);
 
       try {
-        // Calculate total steps and progress
-        const totalSteps = healthData.reduce((sum, day) => sum + day.count, 0);
-        const progress = Math.min(
-          100,
-          Math.round((totalSteps / targetSteps) * 100)
-        );
-
-        // Determine if challenge is completed based on reaching the target
-        const isCompleted = totalSteps >= targetSteps;
-
-        // Submit data to backend for verification
-        const response = await challengeApi.submitHealthData(challengeId, {
+        // Submit enhanced health data to the backend
+        const response = await challengeApi.submitHealthData(
+          challengeId,
           healthData,
-          progress,
-          isCompleted,
-        });
+          targetSteps
+        );
 
         setSubmittingData(false);
 
         if (response.success) {
+          // Calculate total steps for the UI
+          const totalSteps = healthData.reduce(
+            (sum, day) => sum + day.count,
+            0
+          );
+
+          // Calculate progress percentage
+          const progressPercentage = Math.round(
+            (totalSteps / targetSteps) * 100
+          );
+
           return {
             success: true,
-            progress,
-            isCompleted,
+            progress: progressPercentage,
+            isCompleted: response.data.isCompleted,
             totalSteps,
           };
         } else {
-          throw new Error('Failed to submit health data');
+          throw new Error(response.message || 'Failed to submit health data');
         }
       } catch (err: any) {
         console.error('Failed to submit health data for challenge:', err);
@@ -598,6 +599,18 @@ export const useChallenges = () => {
           'Claim reward transaction sent successfully:',
           result.signature
         );
+
+        // Update the backend with the transaction ID
+        const backendResponse = await challengeApi.claimReward(
+          challengeId,
+          result.signature || ''
+        );
+
+        if (!backendResponse.success) {
+          console.warn(
+            'Backend update for claim was not successful, but funds were transferred.'
+          );
+        }
 
         // Refresh the challenges to update the UI
         fetchChallenges();

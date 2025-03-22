@@ -403,3 +403,100 @@ export const joinChallenge = async (
     return next(new ApiError(500, "Failed to join challenge"));
   }
 };
+
+// Claim reward for a completed challenge
+export const claimReward = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    if (!req.user) {
+      return next(new ApiError(401, "Authentication required"));
+    }
+
+    const { did } = req.user;
+    const { id } = req.params;
+    const { transactionId } = req.body;
+
+    // Verify user has wallet address
+    const user = await UserModel.findOne({ privyId: did });
+    if (!user || !user.walletAddress) {
+      return next(
+        new ApiError(
+          400,
+          "Wallet address not set. Please connect your wallet first."
+        )
+      );
+    }
+
+    // Find the challenge
+    const challenge = await Challenge.findById(id);
+
+    if (!challenge) {
+      return next(new ApiError(404, "Challenge not found"));
+    }
+
+    // Verify challenge is completed
+    if (!challenge.isCompleted) {
+      return next(new ApiError(400, "Challenge is not completed yet"));
+    }
+
+    // Verify challenge has been verified on-chain
+    if (!challenge.onChainVerificationComplete) {
+      return next(
+        new ApiError(
+          400,
+          "Challenge verification is still in progress. Please try again later."
+        )
+      );
+    }
+
+    // Find the user's participant record
+    const participantIndex = challenge.participants.findIndex(
+      (p) => p.walletAddress === user.walletAddress
+    );
+
+    if (participantIndex === -1) {
+      return next(
+        new ApiError(400, "You are not a participant in this challenge")
+      );
+    }
+
+    const participant = challenge.participants[participantIndex];
+
+    // Check if participant is eligible for rewards
+    if (!participant.completed) {
+      return next(new ApiError(400, "You did not complete this challenge"));
+    }
+
+    // Check if rewards have already been claimed
+    if (participant.claimed) {
+      return next(
+        new ApiError(400, "You have already claimed rewards for this challenge")
+      );
+    }
+
+    // Mark as claimed if transaction ID is provided
+    if (transactionId) {
+      challenge.participants[participantIndex].claimed = true;
+      await challenge.save();
+    }
+
+    return res.status(200).json(
+      new ApiResponse(
+        200,
+        {
+          challengeId: challenge.id,
+          isCompleted: participant.completed,
+          isClaimed: participant.claimed,
+          transactionId: transactionId || null,
+        },
+        "Reward claim processed successfully"
+      )
+    );
+  } catch (error) {
+    console.error("Error claiming reward:", error);
+    return next(new ApiError(500, "Failed to claim reward"));
+  }
+};

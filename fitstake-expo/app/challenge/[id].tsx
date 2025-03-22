@@ -14,7 +14,6 @@ import {
   Text,
   View,
 } from 'react-native';
-
 import { useChallenges } from '../../hooks/useChallenges';
 import { useHealthConnect } from '../../hooks/useHealthConnect';
 import { useSolanaWallet } from '../../hooks/useSolanaWallet';
@@ -68,11 +67,13 @@ export default function ChallengeDetailsScreen() {
     joinChallenge,
     fetchChallengeById,
     submitHealthData: submitChallengeHealthData,
+    claimReward,
   } = useChallenges();
   const [challenge, setChallenge] = useState<ChallengeDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [joiningChallenge, setJoiningChallenge] = useState(false);
+  const [claimingReward, setClaimingReward] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [personalProgress, setPersonalProgress] = useState(0);
   const [isParticipant, setIsParticipant] = useState(false);
@@ -83,6 +84,9 @@ export default function ChallengeDetailsScreen() {
   const [healthData, setHealthData] = useState<StepsData[]>([]);
   const [sortedParticipants, setSortedParticipants] = useState<Participant[]>(
     []
+  );
+  const [userParticipant, setUserParticipant] = useState<Participant | null>(
+    null
   );
 
   const { fetchStepsForDateRange, loading: healthDataLoading } =
@@ -117,6 +121,7 @@ export default function ChallengeDetailsScreen() {
             );
 
             setIsParticipant(!!participant);
+            setUserParticipant(participant || null);
             if (participant) {
               setPersonalProgress(participant.progress || 0);
             }
@@ -155,7 +160,11 @@ export default function ChallengeDetailsScreen() {
 
       // Calculate total steps and progress
       const totalSteps = stepsData.reduce((sum, day) => sum + day.count, 0);
+
+      // Calculate progress as 0-1 decimal value
       const calculatedProgress = Math.min(1, totalSteps / challenge.goal.value);
+
+      // Set the progress value (0-1 for internal use)
       setPersonalProgress(calculatedProgress);
 
       return stepsData;
@@ -178,6 +187,7 @@ export default function ChallengeDetailsScreen() {
         return;
       }
 
+      // Enhanced health data already includes sources and recordCount from useHealthConnect
       const result = await submitChallengeHealthData(
         challenge.id,
         latestHealthData,
@@ -186,13 +196,70 @@ export default function ChallengeDetailsScreen() {
 
       if (result.success) {
         await fetchChallengeDetails();
-        showSuccessToast('Step data submitted successfully');
+
+        // Show a more informative success message
+        const totalSteps = latestHealthData.reduce(
+          (sum, day) => sum + day.count,
+          0
+        );
+        showSuccessToast(
+          `Data submitted: ${totalSteps.toLocaleString()} steps (${
+            result.progress
+          }% complete)`
+        );
       } else {
         throw new Error(result.error || 'Failed to submit step data');
       }
     } catch (error) {
       console.error('Error submitting step data:', error);
       showErrorToast(error, 'Failed to submit step data');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Sync health data with backend
+  const syncHealthData = async () => {
+    try {
+      if (!challenge) {
+        showErrorToast(null, 'Challenge information not available');
+        return;
+      }
+
+      setSubmitting(true);
+      // Fetch the latest health data and submit it
+      const latestHealthData = await fetchHealthData();
+
+      if (!latestHealthData || latestHealthData.length === 0) {
+        showErrorToast(null, 'No step data available to submit');
+        return;
+      }
+
+      const result = await submitChallengeHealthData(
+        challenge.id,
+        latestHealthData,
+        challenge.goal.value
+      );
+
+      if (result.success) {
+        await fetchChallengeDetails();
+
+        // Show a more informative success message
+        const totalSteps = latestHealthData.reduce(
+          (sum, day) => sum + day.count,
+          0
+        );
+        showSuccessToast(
+          `Data submitted: ${totalSteps.toLocaleString()} steps (${Math.floor(
+            result.progress || 0
+          )}% complete)`
+        );
+      } else {
+        throw new Error(result.error || 'Failed to sync health data');
+      }
+    } catch (error) {
+      console.error('Error syncing health data:', error);
+      showErrorToast(error, 'Failed to sync health data');
     } finally {
       setSubmitting(false);
     }
@@ -270,6 +337,28 @@ export default function ChallengeDetailsScreen() {
     }
   };
 
+  // Handle claiming reward
+  const handleClaimReward = async () => {
+    if (!challenge) return;
+
+    try {
+      setClaimingReward(true);
+      const success = await claimReward(challenge.id);
+
+      if (success) {
+        showSuccessToast('Successfully claimed your reward!');
+        await fetchChallengeDetails(); // Refresh data
+      } else {
+        throw new Error('Failed to claim reward');
+      }
+    } catch (error) {
+      console.error('Error claiming reward:', error);
+      showErrorToast(error, 'Failed to claim reward');
+    } finally {
+      setClaimingReward(false);
+    }
+  };
+
   // Initial data loading
   useEffect(() => {
     fetchChallengeDetails();
@@ -335,6 +424,16 @@ export default function ChallengeDetailsScreen() {
 
   const progressPercentage = Math.floor(personalProgress * 100);
   const isEnded = new Date() > new Date(challenge.endTime * 1000);
+
+  // Check if user is eligible for reward
+  const isEligibleForReward =
+    challenge?.isCompleted &&
+    userParticipant?.completed &&
+    !userParticipant?.claimed;
+
+  // Check if user failed the challenge
+  const userFailedChallenge =
+    challenge?.isCompleted && userParticipant && !userParticipant.completed;
 
   return (
     <View style={styles.container}>
@@ -404,16 +503,54 @@ export default function ChallengeDetailsScreen() {
                   styles.submitButton,
                   (submitting || healthDataLoading) && styles.disabledButton,
                 ]}
-                onPress={submitStepData}
+                onPress={syncHealthData}
                 disabled={submitting || healthDataLoading}
               >
                 {submitting ? (
                   <ActivityIndicator size="small" color={colors.white} />
                 ) : (
-                  <Text style={styles.submitButtonText}>Submit Step Data</Text>
+                  <Text style={styles.submitButtonText}>Sync Step Data</Text>
                 )}
               </Pressable>
             )}
+
+            {/* Claim Reward Button - Show only if challenge is completed and user has not claimed */}
+            {isEligibleForReward && (
+              <Pressable
+                style={[
+                  styles.claimButton,
+                  claimingReward && styles.disabledButton,
+                ]}
+                onPress={handleClaimReward}
+                disabled={claimingReward}
+              >
+                {claimingReward ? (
+                  <ActivityIndicator size="small" color={colors.white} />
+                ) : (
+                  <Text style={styles.claimButtonText}>Claim Reward</Text>
+                )}
+              </Pressable>
+            )}
+
+            {/* Failed Challenge Message */}
+            {userFailedChallenge && (
+              <View style={styles.failedChallengeContainer}>
+                <Text style={styles.failedChallengeText}>
+                  You did not complete this challenge
+                </Text>
+              </View>
+            )}
+
+            {/* Already Claimed Message */}
+            {challenge?.isCompleted &&
+              userParticipant?.completed &&
+              userParticipant?.claimed && (
+                <View style={styles.claimedContainer}>
+                  <Text style={styles.claimedText}>
+                    You have successfully claimed your reward
+                  </Text>
+                </View>
+              )}
           </View>
         )}
       </View>
@@ -785,6 +922,18 @@ const styles = StyleSheet.create({
     fontSize: fontSize.md,
     fontWeight: fontWeight.medium,
   },
+  syncButton: {
+    backgroundColor: colors.gray[700],
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+    marginTop: spacing.md,
+  },
+  syncButtonText: {
+    color: colors.white,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.medium,
+  },
   tabsContainer: {
     flexDirection: 'row',
     paddingHorizontal: spacing.md,
@@ -1017,5 +1166,45 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: spacing.xs,
+  },
+  claimButton: {
+    backgroundColor: colors.accent.primary,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+    marginTop: spacing.md,
+  },
+  claimButtonText: {
+    color: colors.white,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.bold,
+  },
+  failedChallengeContainer: {
+    backgroundColor: colors.gray[800],
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+    marginTop: spacing.md,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.accent.error,
+  },
+  failedChallengeText: {
+    color: colors.accent.error,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.medium,
+  },
+  claimedContainer: {
+    backgroundColor: colors.gray[800],
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+    marginTop: spacing.md,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.accent.primary,
+  },
+  claimedText: {
+    color: colors.accent.primary,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.medium,
   },
 });

@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 // This is the program ID that uniquely identifies this Solana program on the blockchain
-declare_id!("Aky9S499wn2Je1h6DAkV3JWqszYK8LHa2uJkCjwHJnnQ"); 
+declare_id!("5hTA47XZPkJK7d6JrCEcmUaDbt6bgxNjgUDbRBo593er"); 
 
 /* 
  * FitStake Accountability Smart Contract

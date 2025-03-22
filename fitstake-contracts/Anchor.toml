@@ -3,10 +3,10 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-accountability = "Aky9S499wn2Je1h6DAkV3JWqszYK8LHa2uJkCjwHJnnQ"
+accountability = "5hTA47XZPkJK7d6JrCEcmUaDbt6bgxNjgUDbRBo593er"
 
 [programs.devnet]
-accountability = "Aky9S499wn2Je1h6DAkV3JWqszYK8LHa2uJkCjwHJnnQ"
+accountability = "5hTA47XZPkJK7d6JrCEcmUaDbt6bgxNjgUDbRBo593er"
 
 [registry]
 url = "https://api.apr.dev"

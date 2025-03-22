@@ -37,3 +37,6 @@ coverage
 *.swp
 *.swo
 .DS_Store
+
+# Sensitive files
+src/config/keypair.json

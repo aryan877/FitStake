@@ -41,12 +41,22 @@ export default function ChallengesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
+
+  // Set default dates for new challenges
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(23, 59, 59, 0);
+
+  const now = new Date();
+  now.setMinutes(now.getMinutes() + 10); // Set start time 10 minutes from now
+
   const [newChallenge, setNewChallenge] = useState({
     title: '',
     description: '',
     stakeAmount: '0.1',
     goalSteps: '10000',
-    durationDays: '1',
+    startDate: now,
+    endDate: tomorrow,
     minParticipants: '2',
     maxParticipants: '10',
   });
@@ -172,12 +182,15 @@ export default function ChallengesScreen() {
       return;
     }
 
-    const durationDays = parseInt(newChallenge.durationDays);
-    if (isNaN(durationDays) || durationDays <= 0) {
-      Alert.alert(
-        'Invalid Duration',
-        'Please enter a valid duration in days greater than 0.'
-      );
+    // Validate dates
+    const currentTime = new Date();
+    if (newChallenge.startDate < currentTime) {
+      Alert.alert('Invalid Start Date', 'Start date cannot be in the past.');
+      return;
+    }
+
+    if (newChallenge.endDate <= newChallenge.startDate) {
+      Alert.alert('Invalid End Date', 'End date must be after the start date.');
       return;
     }
 
@@ -213,15 +226,18 @@ export default function ChallengesScreen() {
     setIsCreating(true);
 
     try {
-      const now = Math.floor(Date.now() / 1000);
-      const endTime = now + durationDays * 24 * 60 * 60; // Convert days to seconds
+      // Convert dates to timestamps
+      const startTimestamp = Math.floor(
+        newChallenge.startDate.getTime() / 1000
+      );
+      const endTimestamp = Math.floor(newChallenge.endDate.getTime() / 1000);
 
       const challengeParams = {
         title: newChallenge.title,
         description: newChallenge.description,
         stakeAmount: Math.floor(stakeAmount * LAMPORTS_PER_SOL), // Convert SOL to lamports
-        startTime: now,
-        endTime: endTime,
+        startTime: startTimestamp,
+        endTime: endTimestamp,
         minParticipants: minParticipants,
         maxParticipants: maxParticipants,
         goalSteps: goalSteps,
@@ -233,12 +249,20 @@ export default function ChallengesScreen() {
         showSuccessToast('Challenge created successfully!');
         setCreateModalVisible(false);
         // Reset form
+        const resetNow = new Date();
+        resetNow.setMinutes(resetNow.getMinutes() + 10);
+
+        const resetTomorrow = new Date();
+        resetTomorrow.setDate(resetTomorrow.getDate() + 1);
+        resetTomorrow.setHours(23, 59, 59, 0);
+
         setNewChallenge({
           title: '',
           description: '',
           stakeAmount: '0.1',
           goalSteps: '10000',
-          durationDays: '1',
+          startDate: resetNow,
+          endDate: resetTomorrow,
           minParticipants: '2',
           maxParticipants: '10',
         });
@@ -265,7 +289,7 @@ export default function ChallengesScreen() {
     }
   };
 
-  const handleChallengeFormChange = (field: string, value: string) => {
+  const handleChallengeFormChange = (field: string, value: string | Date) => {
     setNewChallenge((prev) => ({
       ...prev,
       [field]: value,

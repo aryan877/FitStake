@@ -2,9 +2,23 @@ import { getAccessToken } from '@privy-io/expo';
 import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 import axios from 'axios';
 
-export interface StepsData {
+export interface StepRecord {
   count: number;
+  startTime: string;
+  endTime: string;
+  recordingMethod?: number;
+  dataOrigin?: string;
+  id?: string;
+  lastModifiedTime?: string;
+}
+
+export interface StepsData {
   date: string;
+  count: number;
+  sources?: string[];
+  recordCount?: number;
+  timestamps?: number[];
+  records?: StepRecord[];
 }
 
 // Get backend URL from environment variables
@@ -218,20 +232,30 @@ export const challengeApi = {
   // Submit health data for a challenge
   submitHealthData: async (
     id: string,
-    data: {
-      healthData: StepsData[];
-      progress: number;
-      isCompleted: boolean;
-    }
+    data: StepsData[],
+    targetSteps: number
   ) => {
     try {
-      const response = await api.post(
-        `/health/challenges/${id}/health-data`,
-        data
-      );
+      // Send health data with verification metadata to the backend
+      const response = await api.post(`/health/challenges/${id}/health-data`, {
+        healthData: data,
+      });
       return response.data;
     } catch (error) {
       console.error(`Error submitting health data for challenge ${id}:`, error);
+      throw error;
+    }
+  },
+
+  // Claim rewards for a completed challenge
+  claimReward: async (id: string, transactionId: string) => {
+    try {
+      const response = await api.post(`/health/challenges/${id}/claim`, {
+        transactionId,
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Error claiming reward for challenge ${id}:`, error);
       throw error;
     }
   },
@@ -243,17 +267,6 @@ export const challengeApi = {
       return response.data;
     } catch (error) {
       console.error(`Error getting progress for challenge ${id}:`, error);
-      throw error;
-    }
-  },
-
-  // Force sync health data for all user's active challenges
-  syncAllChallenges: async () => {
-    try {
-      const response = await api.post('/health/challenges/sync-health-data');
-      return response.data;
-    } catch (error) {
-      console.error('Error syncing health data for challenges:', error);
       throw error;
     }
   },

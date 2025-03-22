@@ -5,11 +5,13 @@
   "scripts": {
     "test": "anchor test",
     "build": "anchor build",
-    "deploy": "anchor deploy",
-    "copy-idl": "mkdir -p ../fitstake-expo/src/idl && cp target/idl/accountability.json ../fitstake-expo/src/idl/",
-    "build-and-copy": "npm run build && npm run copy-idl",
-    "deploy-and-copy": "npm run deploy && npm run copy-idl",
-    "full-workflow": "npm run build && npm run deploy && npm run copy-idl"
+    "deploy": "ANCHOR_WALLET=keypair.json ANCHOR_PROVIDER_URL=https://api.devnet.solana.com UPGRADE_AUTHORITY=keypair.json anchor deploy",
+    "copy-idl-expo": "mkdir -p ../fitstake-expo/idl && cp target/idl/accountability.json ../fitstake-expo/idl/",
+    "copy-idl-backend": "mkdir -p ../fistake-backend/src/idl && cp target/idl/accountability.json ../fistake-backend/src/idl/",
+    "copy-keypair-backend": "mkdir -p ../fistake-backend/src/config && cp keypair.json ../fistake-backend/src/config/",
+    "build-and-copy": "npm run build && npm run copy-idl-expo && npm run copy-idl-backend",
+    "deploy-and-copy": "npm run deploy && npm run copy-idl-expo && npm run copy-idl-backend && npm run copy-keypair-backend",
+    "full-workflow": "chmod +x ./build-deploy-copy.sh && ./build-deploy-copy.sh"
   },
   "dependencies": {
     "@project-serum/anchor": "^0.26.0",

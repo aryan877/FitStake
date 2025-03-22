@@ -319,5 +319,8 @@
       "name": "UnauthorizedAdmin",
       "msg": "Unauthorized admin"
     }
-  ]
+  ],
+  "metadata": {
+    "address": "5hTA47XZPkJK7d6JrCEcmUaDbt6bgxNjgUDbRBo593er"
+  }
 }

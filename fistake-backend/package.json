@@ -10,7 +10,9 @@
     "test": "jest"
   },
   "dependencies": {
+    "@project-serum/anchor": "^0.26.0",
     "@solana/web3.js": "^1.87.6",
+    "@types/node-cron": "^3.0.11",
     "axios": "^1.8.3",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.7",
@@ -22,6 +24,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.0.3",
     "morgan": "^1.10.0",
+    "node-cron": "^3.0.3",
     "zod": "^3.22.4"
   },
   "devDependencies": {

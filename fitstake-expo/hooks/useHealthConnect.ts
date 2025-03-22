@@ -5,6 +5,16 @@ import { StepsData } from '../app/services/api';
 // Health Connect is only available on Android
 const isAndroid = Platform.OS === 'android';
 
+export interface StepRecord {
+  count: number;
+  startTime: string;
+  endTime: string;
+  recordingMethod?: number;
+  dataOrigin?: string;
+  id?: string;
+  lastModifiedTime?: string;
+}
+
 export const useHealthConnect = () => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [hasPermissions, setHasPermissions] = useState(false);
@@ -69,7 +79,9 @@ export const useHealthConnect = () => {
     setError(null);
 
     try {
-      const { readRecords } = await import('react-native-health-connect');
+      const { aggregateRecord, readRecords } = await import(
+        'react-native-health-connect'
+      );
       const results: StepsData[] = [];
       const today = new Date();
 
@@ -85,7 +97,17 @@ export const useHealthConnect = () => {
         endDate.setHours(23, 59, 59, 999);
 
         try {
-          // First read all steps records for the day
+          // Get aggregated steps for the day
+          const aggregatedSteps = await aggregateRecord({
+            recordType: 'Steps',
+            timeRangeFilter: {
+              operator: 'between',
+              startTime: startDate.toISOString(),
+              endTime: endDate.toISOString(),
+            },
+          });
+
+          // Get records for collecting source information
           const stepsResponse = await readRecords('Steps', {
             timeRangeFilter: {
               operator: 'between',
@@ -94,63 +116,71 @@ export const useHealthConnect = () => {
             },
           });
 
-          // Filter only automatically recorded data (RECORDING_METHOD_AUTOMATICALLY_RECORDED = 2)
-          let totalSteps = 0;
-
-          console.log(
-            `[${displayDate}] Total records: ${
-              stepsResponse?.records?.length || 0
-            }`
-          );
-
-          if (stepsResponse && stepsResponse.records) {
-            // Log the first record to see its structure
-            if (stepsResponse.records.length > 0) {
-              console.log(
-                'Sample record structure:',
-                JSON.stringify(stepsResponse.records[0], null, 2)
-              );
-            }
-
-            // Filter records where recording method is "automatically recorded" (value 2)
-            const automaticRecords = stepsResponse.records.filter(
-              (record) =>
-                record.metadata && record.metadata.recordingMethod === 2
-            );
-
+          console.log('=== HEALTH DATA BOUNDARY START ===');
+          console.log('Steps response details:');
+          console.log('- Page Token:', stepsResponse.pageToken);
+          console.log('- Records count:', stepsResponse.records?.length || 0);
+          console.log('- Records:');
+          stepsResponse.records?.forEach((record, index) => {
             console.log(
-              `[${displayDate}] Automatic records: ${automaticRecords.length}`
+              `  [${index}] Count: ${record.count}, Start: ${record.startTime}, End: ${record.endTime}`
             );
+            console.log(
+              `      Metadata:`,
+              JSON.stringify(record.metadata, null, 2)
+            );
+          });
+          console.log('=== HEALTH DATA BOUNDARY END ===');
 
-            // Sum up the steps from automatically recorded data
-            automaticRecords.forEach((record) => {
-              if (record.count) {
-                totalSteps += record.count;
-              }
-            });
+          const totalSteps = aggregatedSteps.COUNT_TOTAL || 0;
+          const dataSources = new Set<string>();
+          const recordCount = stepsResponse?.records?.length || 0;
 
-            // Also calculate total for comparison
-            let allStepsTotal = 0;
+          // New: store individual records for enhanced verification
+          const individualRecords: StepRecord[] = [];
+
+          // Collect data sources to send to backend
+          if (recordCount > 0) {
             stepsResponse.records.forEach((record) => {
-              if (record.count) {
-                allStepsTotal += record.count;
+              if (record.metadata?.dataOrigin) {
+                dataSources.add(record.metadata.dataOrigin);
               }
-            });
 
-            console.log(
-              `[${displayDate}] Automatic steps: ${totalSteps}, All steps: ${allStepsTotal}`
-            );
+              // Add each record as an individual entry
+              individualRecords.push({
+                count: record.count,
+                startTime: record.startTime,
+                endTime: record.endTime,
+                recordingMethod: record.metadata?.recordingMethod,
+                dataOrigin: record.metadata?.dataOrigin,
+                id: record.metadata?.id,
+                lastModifiedTime: record.metadata?.lastModifiedTime,
+              });
+            });
           }
 
+          console.log(
+            `[${displayDate}] Aggregated steps: ${totalSteps}, Records: ${recordCount}, Sources: ${Array.from(
+              dataSources
+            ).join(', ')}`
+          );
+
+          // Add enhanced data for backend verification
           results.push({
             date: displayDate,
             count: totalSteps,
+            sources: Array.from(dataSources),
+            recordCount,
+            records: individualRecords,
           });
         } catch (dayErr) {
           console.error(`Error fetching steps for ${displayDate}:`, dayErr);
           results.push({
             date: displayDate,
             count: 0,
+            sources: [],
+            recordCount: 0,
+            records: [],
           });
         }
       }
@@ -200,13 +230,48 @@ export const useHealthConnect = () => {
   // Fetch steps data for a specific date range
   const fetchStepsForDateRange = useCallback(
     async (startDate: Date, endDate: Date) => {
-      if (!isAndroid || !isInitialized || !hasPermissions) return [];
+      if (!isAndroid) {
+        console.log('Health Connect is only available on Android');
+        // For iOS or other platforms, return dummy data with empty verification
+        const dayDiff = Math.ceil(
+          (endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24)
+        );
+        const results: StepsData[] = [];
+
+        for (let i = 0; i <= dayDiff; i++) {
+          const date = new Date(startDate);
+          date.setDate(startDate.getDate() + i);
+          results.push({
+            date: date.toLocaleDateString(),
+            count: 0,
+            sources: [],
+            recordCount: 0,
+            timestamps: [],
+            records: [],
+          });
+        }
+
+        return results;
+      }
+
+      if (!isInitialized || !hasPermissions) {
+        console.log('Health Connect not initialized or missing permissions');
+        try {
+          await initialize();
+          await requestPermissions();
+        } catch (err) {
+          console.error('Failed to initialize Health Connect:', err);
+          return [];
+        }
+      }
 
       setLoading(true);
       setError(null);
 
       try {
-        const { readRecords } = await import('react-native-health-connect');
+        const { aggregateRecord, readRecords } = await import(
+          'react-native-health-connect'
+        );
         const results: StepsData[] = [];
 
         // Clone dates to avoid modifying the original
@@ -222,6 +287,12 @@ export const useHealthConnect = () => {
           (end.getTime() - start.getTime()) / (1000 * 3600 * 24)
         );
 
+        console.log(
+          `Fetching step data for ${
+            dayDiff + 1
+          } days from ${start.toLocaleDateString()} to ${end.toLocaleDateString()}`
+        );
+
         // For each day in the range
         for (let i = 0; i <= dayDiff; i++) {
           const date = new Date(start);
@@ -235,7 +306,17 @@ export const useHealthConnect = () => {
           dayEnd.setHours(23, 59, 59, 999);
 
           try {
-            // Read steps for this day
+            // Get aggregated steps for the day
+            const aggregatedSteps = await aggregateRecord({
+              recordType: 'Steps',
+              timeRangeFilter: {
+                operator: 'between',
+                startTime: dayStart.toISOString(),
+                endTime: dayEnd.toISOString(),
+              },
+            });
+
+            // Get records for collecting source information
             const stepsResponse = await readRecords('Steps', {
               timeRangeFilter: {
                 operator: 'between',
@@ -244,35 +325,74 @@ export const useHealthConnect = () => {
               },
             });
 
-            // Filter automatic records and sum steps
-            let totalSteps = 0;
+            const totalSteps = aggregatedSteps.COUNT_TOTAL || 0;
+            const dataSources = new Set<string>();
+            const recordCount = stepsResponse?.records?.length || 0;
+            const timestamps: number[] = [];
 
-            if (stepsResponse && stepsResponse.records) {
-              const automaticRecords = stepsResponse.records.filter(
-                (record) =>
-                  record.metadata && record.metadata.recordingMethod === 2
-              );
+            // New: store individual records for enhanced verification
+            const individualRecords: StepRecord[] = [];
 
-              automaticRecords.forEach((record) => {
-                if (record.count) {
-                  totalSteps += record.count;
+            // Collect data sources and timestamps to send to backend for better verification
+            if (recordCount > 0) {
+              stepsResponse.records.forEach((record) => {
+                if (record.metadata?.dataOrigin) {
+                  dataSources.add(record.metadata.dataOrigin);
                 }
+
+                // Collect time points to detect distributed readings
+                if (record.startTime) {
+                  const timestamp = new Date(record.startTime).getTime();
+                  timestamps.push(timestamp);
+                }
+
+                // Add each record as an individual entry for detailed verification
+                individualRecords.push({
+                  count: record.count,
+                  startTime: record.startTime,
+                  endTime: record.endTime,
+                  recordingMethod: record.metadata?.recordingMethod,
+                  dataOrigin: record.metadata?.dataOrigin,
+                  id: record.metadata?.id,
+                  lastModifiedTime: record.metadata?.lastModifiedTime,
+                });
               });
             }
 
+            // Sort timestamps for better analysis
+            timestamps.sort();
+
+            // Log data for each day
+            console.log(
+              `[${displayDate}] Steps: ${totalSteps}, Records: ${recordCount}, Sources: ${Array.from(
+                dataSources
+              ).join(', ')}`
+            );
+
+            // Add enhanced data for backend verification
             results.push({
               date: displayDate,
               count: totalSteps,
+              sources: Array.from(dataSources),
+              recordCount,
+              timestamps:
+                timestamps.length > 10 ? timestamps.slice(0, 10) : timestamps, // Limit timestamp data
+              records: individualRecords,
             });
           } catch (dayErr) {
             console.error(`Error fetching steps for ${displayDate}:`, dayErr);
             results.push({
               date: displayDate,
               count: 0,
+              sources: [],
+              recordCount: 0,
+              timestamps: [],
+              records: [],
             });
           }
         }
 
+        setStepsData(results);
         setLoading(false);
         return results;
       } catch (err) {
@@ -282,7 +402,7 @@ export const useHealthConnect = () => {
         return [];
       }
     },
-    [isInitialized, hasPermissions]
+    [isInitialized, hasPermissions, initialize, requestPermissions]
   );
 
   const setupHealthConnect = useCallback(async () => {

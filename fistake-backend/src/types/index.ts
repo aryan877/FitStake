@@ -7,6 +7,22 @@ export interface User {
   createdAt: Date;
 }
 
+// Frontend health data structure (coming from client)
+export interface FrontendHealthData {
+  date: string;
+  count: number;
+  sources?: string[];
+  recordCount?: number;
+  timestamps?: number[];
+}
+
+// Backend health data structure (stored in database)
+export interface BackendHealthData {
+  date: string;
+  steps: number;
+  lastUpdated: Date;
+}
+
 export interface Challenge {
   id?: string;
   title: string;

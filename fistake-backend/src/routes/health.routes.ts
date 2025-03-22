@@ -1,4 +1,5 @@
 import express from "express";
+import { claimReward } from "../controllers/challenge.controller";
 import {
   getProgress,
   submitHealthData,
@@ -14,16 +15,6 @@ router.post(
   submitHealthData
 );
 router.get("/challenges/:id/progress", authenticatePrivyToken, getProgress);
-router.post(
-  "/challenges/sync-health-data",
-  authenticatePrivyToken,
-  (req, res) => {
-    // This is a placeholder for future implementation
-    res.status(200).json({
-      success: true,
-      message: "Health data sync initiated",
-    });
-  }
-);
+router.post("/challenges/:id/claim", authenticatePrivyToken, claimReward);
 
 export default router;

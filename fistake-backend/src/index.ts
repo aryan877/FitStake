@@ -10,6 +10,7 @@ import { errorHandler, notFound } from "./middleware/error.middleware";
 import authRoutes from "./routes/auth.routes";
 import challengeRoutes from "./routes/challenge.routes";
 import healthRoutes from "./routes/health.routes";
+import cronService from "./services/cron.service";
 
 dotenv.config();
 
@@ -50,6 +51,9 @@ const connectDB = async () => {
       process.env.MONGODB_URI || "mongodb://localhost:27017/fitstake";
     await mongoose.connect(mongoURI);
     console.log("Connected to MongoDB");
+
+    // Initialize cron jobs after successful DB connection
+    cronService.initCronJobs();
   } catch (err) {
     console.error("MongoDB connection error:", err);
     process.exit(1);
