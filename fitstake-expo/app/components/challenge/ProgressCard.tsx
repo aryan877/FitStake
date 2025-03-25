@@ -93,13 +93,13 @@ export const ProgressCard = ({
             <Pressable
               style={[
                 styles.refreshButton,
-                isLoading && !isSubmitting && styles.disabledButton,
+                (isLoading || isSubmitting) && styles.disabledButton,
               ]}
               onPress={onRefreshData}
               disabled={isLoading || isSubmitting}
               onLongPress={showRefreshInfo}
             >
-              {isLoading && !isSubmitting ? (
+              {isLoading ? (
                 <ActivityIndicator size="small" color={colors.white} />
               ) : (
                 <RefreshCw size={14} color={colors.white} />
@@ -133,7 +133,10 @@ export const ProgressCard = ({
 
       {!isCompleted ? (
         <Pressable
-          style={[styles.actionButton, isSubmitting && styles.disabledButton]}
+          style={[
+            styles.actionButton,
+            (isSubmitting || isLoading) && styles.disabledButton,
+          ]}
           onPress={onSyncSteps}
           disabled={isSubmitting || isLoading}
         >
@@ -146,7 +149,9 @@ export const ProgressCard = ({
                 color={colors.white}
                 style={styles.buttonIcon}
               />
-              <Text style={styles.buttonText}>Sync Steps</Text>
+              <Text style={styles.buttonText}>
+                {isLoading ? 'Loading Steps...' : 'Sync Steps'}
+              </Text>
             </>
           )}
         </Pressable>

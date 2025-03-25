@@ -16,7 +16,7 @@ import {
   View,
 } from 'react-native';
 import { useChallenges } from '../../hooks/useChallenges';
-import { useHealthConnect } from '../../hooks/useHealthConnect';
+import { useHealth } from '../../hooks/useHealth';
 import { useSolanaWallet } from '../../hooks/useSolanaWallet';
 import { ChallengeDetails, Participant } from '../../types/challenge';
 import { ChallengeHeader } from '../components/challenge/ChallengeHeader';
@@ -70,8 +70,7 @@ export default function ChallengeDetailsScreen() {
   // Timer ref for cleanup
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const { fetchStepsForDateRange, loading: healthDataLoading } =
-    useHealthConnect();
+  const { fetchStepsForDateRange, loading: healthDataLoading } = useHealth();
 
   // Update time remaining
   const updateTimeRemaining = useCallback(() => {
@@ -145,7 +144,7 @@ export default function ChallengeDetailsScreen() {
 
   // Fetch user's health data for this challenge
   const fetchHealthData = useCallback(async () => {
-    if (!challenge) return;
+    if (!challenge) return [];
 
     try {
       const startDate = new Date(challenge.startTime * 1000);
@@ -156,20 +155,24 @@ export default function ChallengeDetailsScreen() {
       const actualEndDate = now < endDate ? now : endDate;
 
       const stepsData = await fetchStepsForDateRange(startDate, actualEndDate);
-      setHealthData(stepsData);
 
-      // Calculate total steps and progress
-      const totalSteps = stepsData.reduce((sum, day) => sum + day.count, 0);
+      // Only set health data if we got valid data back and component is still mounted
+      if (stepsData && Array.isArray(stepsData)) {
+        setHealthData(stepsData);
 
-      // Calculate progress as 0-1 decimal value
-      const calculatedProgress = Math.min(1, totalSteps / challenge.goal.value);
-
-      // Set the progress value (0-1 for internal use)
-      setPersonalProgress(calculatedProgress);
+        // Calculate total steps and progress
+        const totalSteps = stepsData.reduce((sum, day) => sum + day.count, 0);
+        const calculatedProgress = Math.min(
+          1,
+          totalSteps / challenge.goal.value
+        );
+        setPersonalProgress(calculatedProgress);
+      }
 
       return stepsData;
     } catch (error) {
       console.error('Error fetching health data:', error);
+      showErrorToast(error, 'Failed to fetch health data');
       return [];
     }
   }, [challenge, fetchStepsForDateRange]);
@@ -274,7 +277,6 @@ export default function ChallengeDetailsScreen() {
         return;
       }
 
-      // Check if user has sufficient balance
       const requiredBalance = challenge.stakeAmount / LAMPORTS_PER_SOL;
       if (balance !== null && balance < requiredBalance) {
         Alert.alert(
@@ -365,10 +367,20 @@ export default function ChallengeDetailsScreen() {
 
   // Load health data when challenge details are loaded
   useEffect(() => {
-    if (challenge && isParticipant) {
-      fetchHealthData();
+    let mounted = true;
+
+    if (challenge && isParticipant && !loading) {
+      fetchHealthData().then((data) => {
+        if (mounted && data) {
+          setHealthData(data);
+        }
+      });
     }
-  }, [challenge, isParticipant, fetchHealthData]);
+
+    return () => {
+      mounted = false;
+    };
+  }, [challenge?.id, isParticipant, loading]);
 
   const onRefresh = async () => {
     setRefreshing(true);

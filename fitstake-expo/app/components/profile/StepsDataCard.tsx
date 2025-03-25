@@ -1,10 +1,11 @@
 import theme from '@/app/theme';
-import { useHealthConnect } from '@/hooks/useHealthConnect';
-import dayjs from 'dayjs';
-import { ActivitySquare, Footprints } from 'lucide-react-native';
-import React, { useEffect } from 'react';
+import { useHealth } from '@/hooks/useHealth';
+import { Footprints, RefreshCw } from 'lucide-react-native';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,6 +15,7 @@ import {
 
 const { colors, spacing, borderRadius, fontSize, fontWeight, shadows } = theme;
 
+// Helper function to format date consistently
 const formatDateString = (dateString: string) => {
   if (!dateString) {
     return 'Unknown date';
@@ -22,62 +24,177 @@ const formatDateString = (dateString: string) => {
   try {
     let date;
 
-    // Check if the date is in MM/DD/YYYY format
-    if (dateString.includes('/')) {
+    // Try to parse the date in a consistent way
+    if (dateString.includes('-') && dateString.length === 10) {
+      // YYYY-MM-DD format (from ISO string)
+      const [year, month, day] = dateString.split('-').map(Number);
+      date = new Date(year, month - 1, day);
+    } else if (dateString.includes('/')) {
+      // MM/DD/YYYY format
       const parts = dateString.split('/');
-      if (parts.length === 3) {
-        const month = parseInt(parts[0]) - 1; // Months are 0-indexed in JS Date
-        const day = parseInt(parts[1]);
-        const year = parseInt(parts[2]);
-        date = dayjs(new Date(year, month, day));
-      } else {
-        date = dayjs(dateString);
-      }
+      const month = parseInt(parts[0], 10) - 1; // Months are 0-indexed in JS Date
+      const day = parseInt(parts[1], 10);
+      const year = parseInt(parts[2], 10);
+      date = new Date(year, month, day);
     } else {
-      date = dayjs(dateString);
+      // Any other format
+      date = new Date(dateString);
     }
 
     // Check if the date is valid
-    if (!date.isValid()) {
-      console.log('Invalid date format:', dateString);
-      return 'Unknown date';
+    if (isNaN(date.getTime())) {
+      console.error('Invalid date format:', dateString);
+      return 'Unknown';
     }
 
-    const today = dayjs();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const dateDay = new Date(date);
+    dateDay.setHours(0, 0, 0, 0);
 
     // Check if the date is today
-    if (date.isSame(today, 'day')) {
+    if (dateDay.getTime() === today.getTime()) {
       return 'Today';
     }
+
     // Check if the date is yesterday
-    else if (date.isSame(today.subtract(1, 'day'), 'day')) {
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    if (dateDay.getTime() === yesterday.getTime()) {
       return 'Yesterday';
     }
 
-    // Format the date as a concise fallback - just month and day
-    return date.format('MMM D');
+    // Format the date as "MMM D" (e.g., "Jan 5")
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   } catch (error) {
     console.error('Error formatting date:', error, dateString);
-    return 'Unknown date';
+    return 'Unknown';
+  }
+};
+
+// Helper function to compare if two dates represent the same day
+const isSameDay = (date1: Date, date2: Date) => {
+  return (
+    date1.getFullYear() === date2.getFullYear() &&
+    date1.getMonth() === date2.getMonth() &&
+    date1.getDate() === date2.getDate()
+  );
+};
+
+// Improved date parsing that handles different formats reliably
+const parseDate = (dateString: string): Date | null => {
+  if (!dateString) return null;
+
+  try {
+    let date: Date;
+
+    // ISO format (YYYY-MM-DD)
+    if (dateString.includes('-') && dateString.length === 10) {
+      const [year, month, day] = dateString.split('-').map(Number);
+      date = new Date(year, month - 1, day);
+    }
+    // MM/DD/YYYY format
+    else if (dateString.includes('/')) {
+      const parts = dateString.split('/');
+      if (parts.length === 3) {
+        const month = parseInt(parts[0], 10) - 1; // Months are 0-indexed in JS Date
+        const day = parseInt(parts[1], 10);
+        const year = parseInt(parts[2], 10);
+        date = new Date(year, month, day);
+      } else {
+        date = new Date(dateString);
+      }
+    }
+    // ISO string with time
+    else if (dateString.includes('T')) {
+      date = new Date(dateString);
+    }
+    // Generic date parsing
+    else {
+      date = new Date(dateString);
+    }
+
+    // Normalize to midnight
+    date.setHours(0, 0, 0, 0);
+
+    // Validate date is valid
+    if (isNaN(date.getTime())) {
+      console.error('Invalid date format:', dateString);
+      return null;
+    }
+
+    return date;
+  } catch (e) {
+    console.error('Error parsing date:', e, dateString);
+    return null;
   }
 };
 
 const StepsDataCard = () => {
   const {
     isAndroid,
+    isIOS,
     stepsData,
     loading,
     error,
     hasPermissions,
     refreshStepsData,
-    setupHealthConnect,
-  } = useHealthConnect();
+    setupHealth,
+  } = useHealth();
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
+  const spinValue = useRef(new Animated.Value(0)).current;
+
+  // Create the rotation animation
+  const startSpinAnimation = () => {
+    spinValue.setValue(0);
+    Animated.loop(
+      Animated.timing(spinValue, {
+        toValue: 1,
+        duration: 1000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    ).start();
+  };
+
+  // Stop the animation
+  const stopSpinAnimation = () => {
+    spinValue.stopAnimation();
+  };
+
+  // Create the spinning effect style
+  const spin = spinValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  // Handle refreshing steps data
+  const handleRefresh = async () => {
+    try {
+      setIsRefreshing(true);
+      startSpinAnimation(); // Start the animation
+      await refreshStepsData();
+      setLastSyncTime(new Date()); // Update last sync time
+    } catch (error) {
+      console.error('Error refreshing steps data:', error);
+    } finally {
+      setIsRefreshing(false);
+      stopSpinAnimation(); // Stop the animation
+    }
+  };
 
   const ConnectionComponent = () => {
     const handleConnect = () => {
-      console.log('Connecting to Health Connect...');
-      setupHealthConnect();
+      console.log(
+        `Connecting to ${isIOS ? 'Apple Health' : 'Health Connect'}...`
+      );
+      setupHealth();
     };
+
+    const healthServiceName = isIOS ? 'Apple Health' : 'Health Connect';
 
     return (
       <View style={styles.stepsCard}>
@@ -88,11 +205,13 @@ const StepsDataCard = () => {
         <View style={styles.connectionContent}>
           <View style={styles.connectionAlertContent}>
             <Text style={styles.connectionAlertTitle}>
-              Connect to Health Connect
+              Connect to {healthServiceName}
             </Text>
             <Text style={styles.connectionAlertText}>
-              FitStake needs access to Health Connect to track your steps. Your
-              fitness apps should be synced with Health Connect separately.
+              FitStake needs access to {healthServiceName} to track your steps.{' '}
+              {isIOS
+                ? 'Your fitness apps should be synced with Apple Health separately.'
+                : 'Your fitness apps should be synced with Health Connect separately.'}
             </Text>
             <Pressable
               style={styles.connectionAlertButton}
@@ -107,13 +226,16 @@ const StepsDataCard = () => {
   };
 
   useEffect(() => {
-    if (isAndroid) {
-      setupHealthConnect();
-    }
-  }, [isAndroid, setupHealthConnect]);
+    const initializeHealth = async () => {
+      await setupHealth();
+      setLastSyncTime(new Date()); // Set initial sync time
+    };
 
-  // iOS specific view
-  if (!isAndroid) {
+    initializeHealth();
+  }, []);
+
+  // Platform-specific view for unavailable health services
+  if ((isAndroid && !isAndroid) || (isIOS && !isIOS)) {
     return (
       <View style={styles.stepsCard}>
         <View style={styles.stepsCardHeader}>
@@ -121,8 +243,12 @@ const StepsDataCard = () => {
           <Text style={styles.stepsCardTitle}>Steps Data</Text>
         </View>
         <View style={styles.emptyStateContainer}>
-          <Text style={styles.stepsCardSubtitle}>Apple Health Integration</Text>
-          <Text style={styles.stepsCardNote}>Coming soon to iOS devices</Text>
+          <Text style={styles.stepsCardSubtitle}>
+            {isIOS ? 'Apple Health' : 'Health Connect'} Integration
+          </Text>
+          <Text style={styles.stepsCardNote}>
+            Coming soon to {isIOS ? 'iOS' : 'Android'} devices
+          </Text>
         </View>
       </View>
     );
@@ -134,7 +260,7 @@ const StepsDataCard = () => {
   }
 
   // Loading state
-  if (loading) {
+  if (loading && !isRefreshing && !stepsData.length) {
     return (
       <View style={styles.stepsCard}>
         <View style={styles.stepsCardHeader}>
@@ -163,123 +289,140 @@ const StepsDataCard = () => {
     );
   }
 
-  // Sort steps data to ensure most recent dates are first
-  // We need to handle different date formats correctly
-  const sortedStepsData = [...stepsData].sort((a, b) => {
-    // Try to parse the dates correctly
-    let dateA, dateB;
+  // Process and normalize the steps data
+  const processStepsData = () => {
+    // Create an array of the last 7 days
+    const result = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalize today to start of day
 
-    try {
-      // Handle MM/DD/YYYY format
-      if (a.date.includes('/')) {
-        const parts = a.date.split('/');
-        if (parts.length === 3) {
-          const month = parseInt(parts[0]) - 1;
-          const day = parseInt(parts[1]);
-          const year = parseInt(parts[2]);
-          dateA = new Date(year, month, day);
-        } else {
-          dateA = new Date(a.date);
+    // Generate dates for the last 7 days
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(today);
+      date.setDate(today.getDate() - i);
+      date.setHours(0, 0, 0, 0); // Ensure we're looking at start of day
+
+      // Format date consistently for comparison
+      const formattedDate = date.toLocaleDateString('en-US'); // MM/DD/YYYY
+      const isoDate = date.toISOString().split('T')[0]; // YYYY-MM-DD
+
+      // Find matching data for this date - try both date formats for reliability
+      const matchingData = stepsData.find((item) => {
+        try {
+          // First try to match using the ISO date string if available
+          if (item.dateISO && item.dateISO === isoDate) {
+            return true;
+          }
+
+          // Then try to parse the date from stepsData
+          const itemDate = parseDate(item.date);
+          if (!itemDate) return false;
+
+          // Compare dates (only year, month, day)
+          return isSameDay(itemDate, date);
+        } catch (e) {
+          console.error('Error comparing dates:', e);
+          return false;
         }
-      } else {
-        dateA = new Date(a.date);
-      }
+      });
 
-      if (b.date.includes('/')) {
-        const parts = b.date.split('/');
-        if (parts.length === 3) {
-          const month = parseInt(parts[0]) - 1;
-          const day = parseInt(parts[1]);
-          const year = parseInt(parts[2]);
-          dateB = new Date(year, month, day);
-        } else {
-          dateB = new Date(b.date);
-        }
-      } else {
-        dateB = new Date(b.date);
-      }
-
-      // If date parsing fails, use the original date strings
-      if (isNaN(dateA.getTime())) dateA = new Date(a.date);
-      if (isNaN(dateB.getTime())) dateB = new Date(b.date);
-
-      // Sort in descending order (most recent first)
-      return dateB.getTime() - dateA.getTime();
-    } catch (error) {
-      console.error('Error sorting dates:', error);
-      // Fallback to string comparison if parsing fails
-      return b.date.localeCompare(a.date);
+      result.push({
+        date: formattedDate,
+        displayDate: formatDateString(formattedDate),
+        count: matchingData ? matchingData.count : 0,
+        // Keep necessary properties for backend verification
+        sources: matchingData?.sources || [],
+        recordCount: matchingData?.recordCount || 0,
+        records: matchingData?.records || [],
+      });
     }
-  });
 
-  // Get today's data (should be the first item in the sorted array)
-  const todayData = sortedStepsData.length > 0 ? sortedStepsData[0] : null;
+    return result;
+  };
+
+  const processedStepsData = processStepsData();
+
+  // Get today's data (first item in processed data)
+  const todayData = processedStepsData[0];
+
+  // Get recent history (up to 5 days)
+  const recentHistory = processedStepsData.slice(0, 5);
+
+  // Format the last sync time
+  const formattedSyncTime = lastSyncTime
+    ? lastSyncTime.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : 'Never';
 
   // Connected with data
   return (
     <View style={styles.stepsCardContainer}>
       {/* Today's Steps Highlight Card */}
-      {todayData && (
-        <View style={styles.todayStepsCard}>
-          <View style={styles.todayStepsHeader}>
-            <Text style={styles.todayStepsTitle}>Today's Steps</Text>
-            <Footprints color={colors.accent.primary} size={28} />
-          </View>
-          <View style={styles.todayStepsContent}>
-            <Text style={styles.todayStepsCount}>{todayData.count}</Text>
-          </View>
+      <View style={styles.todayStepsCard}>
+        <View style={styles.todayStepsHeader}>
+          <Text style={styles.todayStepsTitle}>Today's Steps</Text>
+          <Footprints color={colors.accent.primary} size={28} />
         </View>
-      )}
+        <View style={styles.todayStepsContent}>
+          <Text style={styles.todayStepsCount}>{todayData?.count || 0}</Text>
+        </View>
+      </View>
 
       {/* Weekly Steps History */}
       <View style={styles.stepsHistoryCard}>
         <View style={styles.stepsCardHeader}>
           <Text style={styles.stepsHistoryTitle}>Weekly History</Text>
+          <Pressable
+            style={styles.refreshButton}
+            onPress={handleRefresh}
+            disabled={isRefreshing}
+          >
+            <Animated.View style={{ transform: [{ rotate: spin }] }}>
+              <RefreshCw size={20} color={colors.accent.primary} />
+            </Animated.View>
+          </Pressable>
         </View>
 
-        {sortedStepsData.length === 0 ? (
-          <View style={styles.emptyStateContainer}>
-            <ActivitySquare color={colors.gray[400]} size={40} />
-            <Text style={styles.stepsCardSubtitle}>
-              No steps data available
-            </Text>
-          </View>
-        ) : (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.cardsScrollContainer}
-          >
-            {sortedStepsData.map((data, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.stepsDayCard,
-                  index === 0 && styles.firstStepsDayCard,
-                  index === sortedStepsData.length - 1 &&
-                    styles.lastStepsDayCard,
-                ]}
-              >
-                <Text style={styles.stepsDate}>
-                  {formatDateString(data.date)}
-                </Text>
-                <View style={styles.stepsCountContainer}>
-                  <Footprints
-                    size={20}
-                    color={
-                      data.count > 0 ? colors.accent.primary : colors.gray[600]
-                    }
-                  />
-                  <Text style={styles.stepsCountText}>{data.count}</Text>
-                </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.stepsHistoryScrollContent}
+        >
+          {recentHistory.map((item, index) => (
+            <View key={index} style={styles.stepsDayCard}>
+              <Text style={styles.stepsDayTitle}>{item.displayDate}</Text>
+              <View style={styles.stepsIconContainer}>
+                <Footprints
+                  size={24}
+                  color={
+                    item.count > 0 ? colors.accent.primary : colors.gray[500]
+                  }
+                />
               </View>
-            ))}
-          </ScrollView>
-        )}
+              <Text style={styles.stepsDayCount}>{item.count}</Text>
+            </View>
+          ))}
+        </ScrollView>
+
+        {/* Last sync indicator */}
+        <View style={styles.lastSyncContainer}>
+          <Text style={styles.lastSyncText}>
+            Last synced: {formattedSyncTime}
+          </Text>
+        </View>
       </View>
 
-      <Pressable style={styles.actionButton} onPress={() => refreshStepsData()}>
-        <Text style={styles.actionButtonText}>Refresh Steps Data</Text>
+      {/* Refresh Button */}
+      <Pressable
+        style={styles.refreshStepsButton}
+        onPress={handleRefresh}
+        disabled={isRefreshing}
+      >
+        <Text style={styles.refreshStepsButtonText}>
+          {isRefreshing ? 'Refreshing...' : 'Refresh Steps Data'}
+        </Text>
       </Pressable>
     </View>
   );
@@ -299,82 +442,86 @@ const styles = StyleSheet.create({
   stepsCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.sm,
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
   },
   stepsCardTitle: {
     fontSize: fontSize.lg,
     fontWeight: fontWeight.bold,
     color: colors.white,
+    flex: 1,
     marginLeft: spacing.sm,
-  },
-  stepsHistoryTitle: {
-    fontSize: fontSize.lg,
-    fontWeight: fontWeight.bold,
-    color: colors.white,
   },
   stepsCardSubtitle: {
     fontSize: fontSize.md,
-    color: colors.gray[300],
-    marginTop: spacing.sm,
-  },
-  stepsCardError: {
-    fontSize: fontSize.md,
-    color: colors.accent.error,
-    marginTop: spacing.sm,
+    fontWeight: fontWeight.medium,
+    color: colors.white,
+    marginBottom: spacing.xs,
   },
   stepsCardNote: {
     fontSize: fontSize.sm,
     color: colors.gray[400],
-    marginTop: spacing.xs,
+  },
+  stepsCardError: {
+    fontSize: fontSize.md,
+    color: colors.accent.error,
+    textAlign: 'center',
+    padding: spacing.md,
   },
   loader: {
-    marginVertical: spacing.md,
+    paddingVertical: spacing.xl,
   },
   emptyStateContainer: {
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.xl,
-  },
-  connectionContent: {
     padding: spacing.md,
   },
+  connectionContent: {
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+  },
   connectionAlertContent: {
-    flex: 1,
+    backgroundColor: colors.gray[800],
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: colors.gray[700],
   },
   connectionAlertTitle: {
-    fontSize: fontSize.lg,
+    fontSize: fontSize.md,
     fontWeight: fontWeight.bold,
     color: colors.white,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs,
   },
   connectionAlertText: {
     fontSize: fontSize.sm,
-    color: colors.gray[300],
+    color: colors.gray[400],
     marginBottom: spacing.md,
-    lineHeight: 20,
   },
   connectionAlertButton: {
     backgroundColor: colors.accent.primary,
-    borderRadius: borderRadius.lg,
     padding: spacing.sm,
+    borderRadius: borderRadius.md,
     alignItems: 'center',
-    alignSelf: 'flex-start',
   },
   connectionAlertButtonText: {
-    color: colors.white,
+    fontSize: fontSize.sm,
     fontWeight: fontWeight.bold,
+    color: colors.white,
   },
+  // Today's steps card
   todayStepsCard: {
-    backgroundColor: colors.gray[800],
+    backgroundColor: colors.gray[900],
     borderRadius: borderRadius.xl,
     padding: spacing.md,
     marginBottom: spacing.md,
+    ...shadows.sm,
   },
   todayStepsHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
   },
   todayStepsTitle: {
     fontSize: fontSize.lg,
@@ -383,61 +530,77 @@ const styles = StyleSheet.create({
   },
   todayStepsContent: {
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
   },
   todayStepsCount: {
-    fontSize: 42,
+    fontSize: fontSize.xxxl,
     fontWeight: fontWeight.bold,
     color: colors.white,
-    marginBottom: spacing.sm,
   },
+  // Steps history card
   stepsHistoryCard: {
     backgroundColor: colors.gray[900],
     borderRadius: borderRadius.xl,
     padding: spacing.md,
     marginBottom: spacing.md,
+    ...shadows.sm,
   },
-  cardsScrollContainer: {
+  stepsHistoryTitle: {
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.bold,
+    color: colors.white,
+  },
+  stepsHistoryScrollContent: {
     paddingVertical: spacing.sm,
   },
   stepsDayCard: {
     backgroundColor: colors.gray[800],
     borderRadius: borderRadius.lg,
     padding: spacing.md,
-    marginRight: spacing.sm,
-    width: 110,
+    minWidth: 100,
+    marginRight: spacing.md,
     alignItems: 'center',
   },
-  firstStepsDayCard: {
-    marginLeft: 0,
-  },
-  lastStepsDayCard: {
-    marginRight: 0,
-  },
-  stepsDate: {
+  stepsDayTitle: {
     fontSize: fontSize.sm,
     fontWeight: fontWeight.medium,
     color: colors.gray[300],
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs,
   },
-  stepsCountContainer: {
-    alignItems: 'center',
+  stepsIconContainer: {
+    marginVertical: spacing.sm,
   },
-  stepsCountText: {
+  stepsDayCount: {
     fontSize: fontSize.xl,
     fontWeight: fontWeight.bold,
     color: colors.white,
-    marginTop: spacing.sm,
   },
-  actionButton: {
-    backgroundColor: colors.accent.primary,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
+  // Last sync indicator
+  lastSyncContainer: {
+    marginTop: spacing.sm,
     alignItems: 'center',
   },
-  actionButtonText: {
-    color: colors.white,
-    fontWeight: fontWeight.bold,
+  lastSyncText: {
+    fontSize: fontSize.xs,
+    color: colors.gray[400],
+    fontStyle: 'italic',
+  },
+  // Refresh button
+  refreshStepsButton: {
+    backgroundColor: colors.accent.primary,
+    padding: spacing.md,
+    borderRadius: borderRadius.xl,
+    alignItems: 'center',
+    ...shadows.sm,
+  },
+  refreshStepsButtonText: {
     fontSize: fontSize.md,
+    fontWeight: fontWeight.bold,
+    color: colors.white,
+  },
+  refreshButton: {
+    padding: spacing.xs,
   },
 });
 

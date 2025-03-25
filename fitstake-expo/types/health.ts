@@ -14,6 +14,7 @@ export interface StepRecord {
 
 export interface StepsData {
   date: string;
+  dateISO?: string; // ISO format date string (YYYY-MM-DD)
   count: number;
   sources?: string[];
   recordCount?: number;

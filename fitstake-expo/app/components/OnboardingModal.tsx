@@ -83,7 +83,7 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({
       setIsCreatingWallet(true);
       if (!create) throw new Error('Wallet creation not available');
 
-      const wallet = await create({ recoveryMethod: 'privy' });
+      await create({ recoveryMethod: 'privy' });
       console.log('Wallet created successfully');
       setCurrentStep('wallet-created');
       // Auto-transition to username setup after 2 seconds
@@ -111,7 +111,7 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({
       setIsCheckingUsername(true);
       const response = await authApi.checkUsername(username);
 
-      if (!response.data.available) {
+      if (!response.data.isAvailable) {
         setUsernameError('Username is already taken');
         return false;
       }
