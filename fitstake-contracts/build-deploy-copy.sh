@@ -19,14 +19,14 @@ if ! command -v solana &> /dev/null; then
     exit 1
 fi
 
-# Check if Solana is configured for devnet
+# Set to devnet if not already
 NETWORK=$(solana config get | grep "RPC URL" | grep -i devnet || echo "NOT_DEVNET")
 if [[ $NETWORK == "NOT_DEVNET" ]]; then
     echo -e "${YELLOW}Setting Solana CLI to devnet...${NC}"
     solana config set --url https://api.devnet.solana.com
 fi
 
-# Check for keypair.json
+# Ensure keypair.json exists
 if [ ! -f "keypair.json" ]; then
     echo -e "${RED}Error: keypair.json not found${NC}"
     echo -e "Do you want to generate a new keypair? (y/n)"
@@ -45,7 +45,7 @@ fi
 PUBKEY=$(solana-keygen pubkey keypair.json)
 echo -e "${GREEN}Using keypair with pubkey: ${YELLOW}$PUBKEY${NC}"
 
-# Check keypair balance
+# Check/fund keypair balance
 BALANCE=$(solana balance $PUBKEY | grep SOL || echo "0 SOL")
 echo -e "${GREEN}Current balance: ${YELLOW}$BALANCE${NC}"
 
@@ -69,23 +69,22 @@ fi
 
 # Step 1: Build the contract
 echo -e "\n${GREEN}Step 1: Building the Solana contract...${NC}"
-anchor build
+npm run build
 if [ $? -ne 0 ]; then
     echo -e "${RED}Error: Build failed.${NC}"
     exit 1
 fi
 echo -e "${GREEN}✓ Build completed successfully.${NC}"
 
-# Step 2: Check if IDL exists
+# Check if IDL exists
 if [ ! -f "target/idl/accountability.json" ]; then
     echo -e "${RED}Error: IDL file not found at target/idl/accountability.json${NC}"
     exit 1
 fi
 
-# Step 3: Deploy contract
-echo -e "\n${GREEN}Step 3: Deploying the contract with keypair.json...${NC}"
-# Use the keypair explicitly as a provider AND upgrade authority
-ANCHOR_WALLET=keypair.json anchor deploy --provider.cluster devnet --provider.wallet keypair.json
+# Step 2: Deploy contract
+echo -e "\n${GREEN}Step 2: Deploying the contract with keypair.json...${NC}"
+npm run deploy
 if [ $? -ne 0 ]; then
     echo -e "${RED}Error: Deployment failed.${NC}"
     echo -e "${YELLOW}This could be due to insufficient SOL in your keypair.${NC}"
@@ -94,11 +93,11 @@ if [ $? -ne 0 ]; then
 fi
 echo -e "${GREEN}✓ Contract deployed successfully.${NC}"
 
-# Get the program ID from the deployed program
+# Get the program ID
 PROGRAM_ID=$(solana address -k target/deploy/accountability-keypair.json)
 echo -e "\n${GREEN}Program ID: ${YELLOW}$PROGRAM_ID${NC}"
 
-# Verify the upgrade authority
+# Verify upgrade authority
 echo -e "\n${GREEN}Verifying upgrade authority...${NC}"
 AUTHORITY=$(solana program show $PROGRAM_ID --output json | grep -o '"authority": "[^"]*"' | cut -d'"' -f4)
 if [[ "$AUTHORITY" == "$PUBKEY" ]]; then
@@ -108,43 +107,26 @@ else
     echo -e "${YELLOW}Current authority: $AUTHORITY${NC}"
     echo -e "${YELLOW}Your keypair: $PUBKEY${NC}"
     
-    # Attempt to set the keypair as upgrade authority
+    # Set keypair as upgrade authority
     echo -e "${GREEN}Setting your keypair as the upgrade authority...${NC}"
     solana program set-upgrade-authority $PROGRAM_ID --new-upgrade-authority $PUBKEY
     if [ $? -ne 0 ]; then
         echo -e "${RED}Failed to set upgrade authority.${NC}"
-        echo -e "${YELLOW}You might need to manually set the upgrade authority.${NC}"
     else
         echo -e "${GREEN}✓ Successfully set your keypair as the upgrade authority.${NC}"
     fi
 fi
 
-# Step 4: Copy IDL file to Expo project
-echo -e "\n${GREEN}Step 4: Copying IDL to Expo project...${NC}"
-mkdir -p ../fitstake-expo/idl
-cp target/idl/accountability.json ../fitstake-expo/idl/
-if [ $? -ne 0 ]; then
-    echo -e "${YELLOW}Warning: Failed to copy IDL file to Expo.${NC}"
-fi
-echo -e "${GREEN}✓ IDL file copied to Expo successfully.${NC}"
-
-# Step 5: Copy IDL and keypair to backend
-echo -e "\n${GREEN}Step 5: Copying IDL and keypair to backend...${NC}"
-mkdir -p ../fistake-backend/src/idl ../fistake-backend/src/config
-cp target/idl/accountability.json ../fistake-backend/src/idl/
-cp keypair.json ../fistake-backend/src/config/
-if [ $? -ne 0 ]; then
-    echo -e "${YELLOW}Warning: Failed to copy files to backend.${NC}"
-fi
-echo -e "${GREEN}✓ Files copied to backend successfully.${NC}"
-
-# Record the program ID for future reference
-echo -e "\n${GREEN}Program ID: ${YELLOW}$PROGRAM_ID${NC}"
-echo -e "Use this ID in your app configuration."
+# Step 3: Copy files
+echo -e "\n${GREEN}Step 3: Copying IDL and keypair files...${NC}"
+npm run copy-idl
+npm run copy-keypair
+echo -e "${GREEN}✓ Files copied successfully.${NC}"
 
 # Update Anchor.toml with the program ID
+echo -e "\n${GREEN}Updating Anchor.toml with program ID...${NC}"
 sed -i '' "s/accountability = \"[^\"]*\"/accountability = \"$PROGRAM_ID\"/g" Anchor.toml
-echo -e "${GREEN}✓ Updated Anchor.toml with the new program ID.${NC}"
+echo -e "${GREEN}✓ Updated Anchor.toml with program ID: ${YELLOW}$PROGRAM_ID${NC}"
 
 echo -e "\n${GREEN}All tasks completed successfully!${NC}"
 echo -e "${YELLOW}===================================${NC}"
