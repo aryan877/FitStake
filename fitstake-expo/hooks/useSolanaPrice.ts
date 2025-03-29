@@ -1,3 +1,4 @@
+import { HermesClient } from '@pythnetwork/hermes-client';
 import { useCallback, useEffect, useState } from 'react';
 
 interface SolanaPriceData {
@@ -12,6 +13,10 @@ interface SolanaPriceData {
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
 let cachedPrice: SolanaPriceData | null = null;
 let lastFetchTime = 0;
+
+// Create a Hermes client instance
+const hermesClient = new HermesClient('https://hermes.pyth.network', {});
+const SOL_USD_SYMBOL = 'Crypto.SOL/USD';
 
 export function useSolanaPrice() {
   const [priceData, setPriceData] = useState<SolanaPriceData>({
@@ -34,13 +39,7 @@ export function useSolanaPrice() {
     setPriceData((prev) => ({ ...prev, loading: true, error: null }));
 
     try {
-      // Dynamic import to avoid issues with React Native environment
-      const { HermesClient } = await import('@pythnetwork/hermes-client');
-
-      // Create a Hermes client with the Pyth Network's public endpoint
-      const hermesClient = new HermesClient('https://hermes.pyth.network', {});
-
-      // Get SOL price feeds
+      // First, find the SOL/USD price feed
       const solPriceFeeds = await hermesClient.getPriceFeeds({
         query: 'sol',
         assetType: 'crypto',
@@ -72,19 +71,22 @@ export function useSolanaPrice() {
       ) {
         // Extract SOL price data from the parsed field
         const solData = priceUpdates.parsed[0];
-        const priceValue =
+        const price =
           Number(solData.price.price) *
           Math.pow(10, Number(solData.price.expo));
-        const confidenceValue =
+        const confidence =
           Number(solData.price.conf) * Math.pow(10, Number(solData.price.expo));
         const timestamp = new Date(
           Number(solData.price.publish_time) * 1000
         ).toISOString();
 
         const newPriceData: SolanaPriceData = {
-          price: priceValue,
-          confidence: confidenceValue,
-          status: solData.price.status?.toString() || 'Trading',
+          price: price,
+          confidence: confidence,
+          status:
+            typeof solData.price.status === 'string'
+              ? solData.price.status
+              : 'Trading',
           lastUpdated: timestamp,
           loading: false,
           error: null,

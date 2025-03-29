@@ -23,7 +23,7 @@ interface ChallengeOverviewProps {
   onCopyId?: () => void;
 }
 
-export const ChallengeOverview = ({
+const ChallengeOverview = ({
   goalValue,
   goalUnit,
   stakeAmount,
@@ -181,6 +181,8 @@ export const ChallengeOverview = ({
     </View>
   );
 };
+
+export default ChallengeOverview;
 
 const styles = StyleSheet.create({
   container: {
@@ -346,5 +348,3 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 });
-
-export default ChallengeOverview;

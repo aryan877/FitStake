@@ -20,7 +20,7 @@ import { useHealth } from '../../hooks/useHealth';
 import { useSolanaWallet } from '../../hooks/useSolanaWallet';
 import { ChallengeDetails, Participant } from '../../types/challenge';
 import { ChallengeHeader } from '../components/challenge/ChallengeHeader';
-import { ChallengeOverview } from '../components/challenge/ChallengeOverview';
+import ChallengeOverview from '../components/challenge/ChallengeOverview';
 import { ChallengeTabs } from '../components/challenge/ChallengeTabs';
 import { CollapsibleDescription } from '../components/challenge/CollapsibleDescription';
 import { JoinChallengeButton } from '../components/challenge/JoinChallengeButton';

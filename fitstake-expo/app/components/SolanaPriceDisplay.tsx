@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useSolanaPrice } from '../../hooks/useSolanaPrice';
 import theme from '../theme';
 
@@ -40,21 +40,23 @@ const SolanaPriceDisplay: React.FC<SolanaPriceDisplayProps> = ({
 
   const color = getColor();
 
-  // Handle loading state
+  // Handle loading state with a more minimal indicator
   if (loading) {
     return (
       <View style={[styles.container, compact && styles.compactContainer]}>
-        <ActivityIndicator size="small" color={color} />
+        <Text style={[styles.priceText, { color }]}>
+          {solAmount ? '$...' : 'SOL: $...'}
+        </Text>
       </View>
     );
   }
 
-  // Handle error state
+  // Handle error state with a fallback value
   if (error) {
     return (
       <View style={[styles.container, compact && styles.compactContainer]}>
-        <Text style={[styles.errorText, { color }]}>
-          Error loading SOL price
+        <Text style={[styles.priceText, { color }]}>
+          {solAmount ? '$???' : 'SOL: $???'}
         </Text>
       </View>
     );
@@ -108,10 +110,6 @@ const styles = StyleSheet.create({
     fontWeight: fontWeight.medium,
   },
   usdText: {
-    fontSize: fontSize.xs,
-    fontWeight: fontWeight.regular,
-  },
-  errorText: {
     fontSize: fontSize.xs,
     fontWeight: fontWeight.regular,
   },
