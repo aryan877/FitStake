@@ -102,10 +102,6 @@ export const useChallenges = () => {
 
         // Use current filters or the ones passed in
         const queryParams = filters || filterParams;
-        console.log(
-          'Fetching challenges with filters:',
-          JSON.stringify(queryParams, null, 2)
-        );
 
         const response = await challengeApi.getAll(queryParams);
 
@@ -176,9 +172,6 @@ export const useChallenges = () => {
       if (apiFilters.searchText === '') {
         delete apiFilters.searchText;
       }
-
-      // Log the filters being used
-      console.log('API filters:', JSON.stringify(apiFilters, null, 2));
 
       try {
         const result = await fetchChallenges(apiFilters);

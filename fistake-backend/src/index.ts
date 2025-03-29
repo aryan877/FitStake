@@ -52,11 +52,9 @@ const connectDB = async () => {
     const mongoURI =
       process.env.MONGODB_URI || "mongodb://localhost:27017/fitstake";
     await mongoose.connect(mongoURI);
-    console.log("Connected to MongoDB");
 
     // Initialize badges
     await badgeService.initializeBadges();
-    console.log("Badges initialized");
 
     // Initialize cron jobs after successful DB connection
     cronService.initCronJobs();

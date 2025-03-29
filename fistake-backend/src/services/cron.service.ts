@@ -39,14 +39,10 @@ try {
 
 // Initialize cron jobs
 export const initCronJobs = () => {
-  console.log("Initializing cron jobs...");
-
   if (!PROGRAM_ID) {
     console.error(
       "Program ID not available, cron jobs may not function correctly"
     );
-  } else {
-    console.log(`Using Solana program: ${PROGRAM_ID.toString()}`);
   }
 
   // Check for ended challenges every 30 seconds
@@ -54,8 +50,6 @@ export const initCronJobs = () => {
 
   // Initialize badges
   badgeService.initializeBadges();
-
-  console.log("Cron jobs initialized");
 };
 
 /**
@@ -85,8 +79,6 @@ const processEndedChallenges = async () => {
     });
 
     if (challenges.length === 0) return;
-
-    console.log(`Processing ${challenges.length} ended challenges`);
 
     for (const challenge of challenges) {
       const { goal } = challenge;
@@ -154,11 +146,6 @@ const processEndedChallenges = async () => {
                   const newBadges = await badgeService.checkAndAwardBadges(
                     user._id.toString()
                   );
-                  if (newBadges.length > 0) {
-                    console.log(
-                      `User ${user.username} earned ${newBadges.length} new badges`
-                    );
-                  }
                 }
               }
             }
@@ -187,10 +174,6 @@ const processEndedChallenges = async () => {
         challenge.onChainVerificationComplete = true;
         await challenge.save();
       }
-
-      console.log(
-        `Challenge ${challenge._id} processed: ${completedWallets.length}/${challenge.participants.length} completed`
-      );
     }
   } catch (error) {
     console.error("Error processing ended challenges:", error);
@@ -217,10 +200,6 @@ const submitCompletedWalletsToContract = async (
     for (let i = 0; i < completedWallets.length; i += BATCH_SIZE) {
       walletBatches.push(completedWallets.slice(i, i + BATCH_SIZE));
     }
-
-    console.log(
-      `Submitting ${completedWallets.length} completions in ${walletBatches.length} batches`
-    );
 
     // Initialize Anchor program
     const provider = new anchor.AnchorProvider(
@@ -259,9 +238,6 @@ const submitCompletedWalletsToContract = async (
 
         // Wait for confirmation
         await connection.confirmTransaction(adminCompleteTx, "confirmed");
-        console.log(
-          `Batch ${batchIndex + 1}/${walletBatches.length} confirmed`
-        );
       } catch (error) {
         console.error(`Error processing batch ${batchIndex + 1}:`, error);
         // Continue with next batch
@@ -280,7 +256,7 @@ const submitCompletedWalletsToContract = async (
         .rpc();
 
       await connection.confirmTransaction(finalizeTx, "confirmed");
-      console.log(`Challenge ${challenge.challengeId} finalized on-chain`);
+
       return true;
     } catch (error) {
       console.error("Error finalizing challenge:", error);

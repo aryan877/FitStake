@@ -124,16 +124,12 @@ export const useHealth = () => {
 
   // Get steps for last week
   const getStepsForLastWeek = useCallback(async () => {
-    // Log which platform we're using for diagnostics
-    console.log(`Getting last week's health data on platform: ${Platform.OS}`);
-
     if (isIOS) {
       return appleHealth.getStepsForLastWeek();
     } else if (isAndroid) {
       return healthConnect.getStepsForLastWeek();
     }
 
-    console.log('No health provider available for this platform');
     return [];
   }, [isIOS, isAndroid, appleHealth, healthConnect]);
 

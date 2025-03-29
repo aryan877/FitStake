@@ -52,21 +52,15 @@ export const useAppleHealth = () => {
     try {
       return new Promise<boolean>((resolve) => {
         AppleHealthKit.getAuthStatus(permissions, (err, result) => {
-          console.log('permissions', permissions);
           if (err) {
             console.error('Error checking permissions:', err);
             resolve(false);
             return;
           }
 
-          // For debugging
-          console.log('Auth status result:', JSON.stringify(result));
-
           const hasPermissions =
             !!result?.permissions?.read &&
             Array.isArray(result.permissions.read);
-
-          console.log('Health permissions status:', { hasPermissions });
 
           setHasPermissions(hasPermissions);
           resolve(hasPermissions);
@@ -264,10 +258,6 @@ export const useAppleHealth = () => {
     startDate.setHours(0, 0, 0, 0);
     endDate.setHours(23, 59, 59, 999);
 
-    console.log(
-      `Getting steps for last week: ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`
-    );
-
     return fetchStepsForDateRange(startDate, endDate);
   }, [isInitialized, hasPermissions, fetchStepsForDateRange]);
 
@@ -297,10 +287,6 @@ export const useAppleHealth = () => {
     startDate.setHours(0, 0, 0, 0); // Midnight start
     endDate.setHours(23, 59, 59, 999); // End of day
 
-    console.log(
-      `Getting steps for last week: ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`
-    );
-
     // Call our reliable function to fetch the data
     return fetchStepsForDateRange(startDate, endDate);
   }, [
@@ -317,30 +303,9 @@ export const useAppleHealth = () => {
     if (!isIOS) return false;
 
     try {
-      console.log('Setting up Apple Health...');
-
       // Reset setup state for a fresh start
       setupCompleted.current = false;
       setError(null);
-
-      const initialized = await initialize();
-      if (!initialized) {
-        console.log('Failed to initialize Apple HealthKit');
-        return false;
-      }
-
-      console.log('Apple HealthKit initialized, checking permissions...');
-
-      // Force request permissions regardless of current state
-      console.log('Requesting health permissions...');
-      const granted = await requestPermissions();
-
-      if (!granted) {
-        console.log('Failed to get health permissions');
-        return false;
-      }
-
-      console.log('Permissions granted successfully, fetching initial data...');
 
       // Use the improved function for fetching data
       const endDate = new Date(); // Now
@@ -359,11 +324,7 @@ export const useAppleHealth = () => {
 
   useEffect(() => {
     if (isIOS && !setupCompleted.current) {
-      setupAppleHealth().then((success) => {
-        if (!success) {
-          console.log('Apple Health setup was not successful');
-        }
-      });
+      setupAppleHealth();
     }
   }, [setupAppleHealth]);
 
@@ -384,10 +345,6 @@ export const useAppleHealth = () => {
         // Ensure proper day boundaries
         startDate.setHours(0, 0, 0, 0);
         endDate.setHours(23, 59, 59, 999);
-
-        console.log(
-          `Refreshing steps for date range: ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`
-        );
 
         return fetchStepsForDateRange(startDate, endDate);
       }

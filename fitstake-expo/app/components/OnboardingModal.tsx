@@ -84,7 +84,6 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({
       if (!create) throw new Error('Wallet creation not available');
 
       await create({ recoveryMethod: 'privy' });
-      console.log('Wallet created successfully');
       setCurrentStep('wallet-created');
       // Auto-transition to username setup after 2 seconds
       setTimeout(() => {

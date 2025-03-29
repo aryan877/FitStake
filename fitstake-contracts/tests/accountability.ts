@@ -42,16 +42,9 @@ describe("accountability", () => {
       ],
       program.programId
     );
-
-    console.log("Challenge account PDA:", challengeAccount.toString());
-    console.log("Vault account PDA:", vaultAccount.toString());
-    console.log("Participant account PDA:", participantAccount.toString());
-    console.log("Using wallet:", provider.wallet.publicKey.toString());
   });
 
   it("Creates a challenge", async () => {
-    console.log("Creating challenge with ID:", challengeId);
-
     try {
       await program.methods
         .createChallenge(
@@ -69,17 +62,7 @@ describe("accountability", () => {
         })
         .rpc();
 
-      console.log("Challenge created successfully");
-
       const challenge = await program.account.challenge.fetch(challengeAccount);
-      console.log("Challenge data:", {
-        id: challenge.challengeId,
-        stakeAmount: challenge.stakeAmount.toString(),
-        startTime: challenge.startTime.toString(),
-        endTime: challenge.endTime.toString(),
-        participantCount: challenge.participantCount,
-        isActive: challenge.isActive,
-      });
 
       // Basic validation
       console.assert(
@@ -113,22 +96,11 @@ describe("accountability", () => {
         })
         .rpc();
 
-      console.log("Successfully joined challenge");
-
       const challenge = await program.account.challenge.fetch(challengeAccount);
-      console.log("Challenge after join:", {
-        participantCount: challenge.participantCount,
-        totalStake: challenge.totalStake.toString(),
-      });
 
       const participant = await program.account.participant.fetch(
         participantAccount
       );
-      console.log("Participant data:", {
-        stakeAmount: participant.stakeAmount.toString(),
-        completed: participant.completed,
-        claimed: participant.claimed,
-      });
 
       // Basic validation
       console.assert(

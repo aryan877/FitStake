@@ -36,11 +36,6 @@ const isExpoGo = Constants.executionEnvironment !== 'standalone';
 const expoGoAppId = 'host.exp.Exponent';
 const expoGoUrlScheme = 'exp';
 
-console.log('Application ID:', bundleId);
-console.log('URL Scheme:', urlScheme);
-console.log('Execution Environment:', Constants.executionEnvironment);
-console.log('Is Expo Go:', isExpoGo);
-
 // Define the global ErrorUtils type that exists in React Native but isn't in TS definitions
 declare global {
   interface Global {
@@ -155,12 +150,6 @@ export default function RootLayout() {
       },
     });
 
-    // Log Privy config values to verify they are set correctly
-    console.log('Privy Config:', {
-      appId: PRIVY_APP_ID,
-      clientIdLength: PRIVY_CLIENT_ID ? PRIVY_CLIENT_ID.length : 0,
-    });
-
     // Set up global error handler to catch unhandled errors
     const errorHandler = (error: Error) => {
       console.error('Unhandled error in app:', error);
@@ -232,7 +221,6 @@ export default function RootLayout() {
     );
   }
 
-  console.log('isFrameworkReady', isFrameworkReady);
   try {
     return (
       <SafeAreaProvider>

@@ -23,11 +23,9 @@ export default function SignInScreen() {
   // Use the email login hook from Privy
   const { state, sendCode, loginWithCode } = useLoginWithEmail({
     onSendCodeSuccess: ({ email }) => {
-      console.log(`Code sent successfully to ${email}`);
       Alert.alert('Success', `Verification code sent to ${email}`);
     },
     onLoginSuccess: (user) => {
-      console.log(`User logged in successfully: ${user.id}`);
       router.replace('/(app)');
     },
     onError: (error) => {
@@ -39,7 +37,6 @@ export default function SignInScreen() {
   // Check if user is already logged in and redirect if needed
   useEffect(() => {
     if (isReady && user) {
-      console.log('User already logged in, redirecting to app');
       router.replace('/(app)');
     }
   }, [isReady, user, router]);

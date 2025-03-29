@@ -187,12 +187,6 @@ export const useSolanaWallet = () => {
           // Set fee payer to the user's wallet
           transaction.feePayer = new PublicKey(state.address);
 
-          console.log('Transaction prepared:', {
-            feePayer: transaction.feePayer.toString(),
-            recentBlockhash: transaction.recentBlockhash,
-            numInstructions: transaction.instructions.length,
-          });
-
           // Verify the transaction before sending
           try {
             const simulation = await conn.simulateTransaction(transaction);
@@ -222,14 +216,12 @@ export const useSolanaWallet = () => {
                 error: errorMsg,
               };
             }
-            console.log('Transaction simulation succeeded');
           } catch (simError) {
             console.error('Failed to simulate transaction:', simError);
             // Continue with the transaction even if simulation fails
           }
         }
 
-        console.log('Sending transaction...');
         const { signature } = await provider.request({
           method: 'signAndSendTransaction',
           params: {
@@ -237,7 +229,6 @@ export const useSolanaWallet = () => {
             connection: conn,
           },
         });
-        console.log('Transaction sent, signature:', signature);
 
         // Wait for confirmation
         try {
@@ -258,7 +249,6 @@ export const useSolanaWallet = () => {
               signature,
             };
           }
-          console.log('Transaction confirmed successfully');
         } catch (confirmError) {
           console.warn(
             'Could not confirm transaction, but it might still succeed:',

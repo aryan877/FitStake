@@ -75,8 +75,6 @@ const ChallengeCard = ({
           'Challenge ID copied to clipboard',
           ToastAndroid.SHORT
         );
-      } else {
-        console.log('Challenge ID copied to clipboard');
       }
     } catch (error) {
       console.error('Failed to copy challenge ID:', error);

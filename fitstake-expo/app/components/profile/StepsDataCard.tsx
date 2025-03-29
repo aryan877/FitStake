@@ -188,9 +188,6 @@ const StepsDataCard = () => {
 
   const ConnectionComponent = () => {
     const handleConnect = () => {
-      console.log(
-        `Connecting to ${isIOS ? 'Apple Health' : 'Health Connect'}...`
-      );
       setupHealth();
     };
 

@@ -26,7 +26,6 @@ export const authenticatePrivyToken = async (
       req.cookies?.["privy-token"];
 
     if (!token) {
-      console.log("Auth failed: No token provided");
       return res
         .status(401)
         .json({ error: "No authentication token provided" });
@@ -57,7 +56,6 @@ export const authenticatePrivyToken = async (
         }
 
         const payload = decoded as PrivyTokenPayload;
-        console.log(`User authenticated: ${payload.sub}`);
 
         // Set user info on request for use in route handlers
         req.user = {
@@ -83,9 +81,7 @@ export const requireAuth = (
   next: NextFunction
 ) => {
   if (!req.user) {
-    console.log("Access denied: Authentication required");
     return res.status(401).json({ error: "Authentication required" });
   }
-  console.log(`Authorized access for user: ${req.user.did}`);
   next();
 };

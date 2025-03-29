@@ -133,12 +133,6 @@ export const useHealthConnect = () => {
             });
           }
 
-          console.log(
-            `[${displayDate}] Aggregated steps: ${totalSteps}, Records: ${recordCount}, Sources: ${Array.from(
-              dataSources
-            ).join(', ')}`
-          );
-
           // Add enhanced data for backend verification
           results.push({
             date: displayDate,
@@ -336,10 +330,6 @@ export const useHealthConnect = () => {
     const endDate = new Date(); // Now
     const startDate = new Date();
     startDate.setDate(endDate.getDate() - 6); // Last 7 days (including today)
-
-    console.log(
-      `Getting steps for last week: ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`
-    );
 
     // Call our more reliable function to fetch the data
     return fetchStepsForDateRange(startDate, endDate);

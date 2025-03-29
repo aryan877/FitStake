@@ -417,7 +417,6 @@ export default function ChallengesScreen() {
   const handleApplyFilters = async () => {
     try {
       setIsSearching(true);
-      console.log('Applying filters:', filters);
 
       // Make sure the filters match the active tab
       const updatedFilters = {
@@ -880,6 +879,7 @@ const styles = StyleSheet.create({
   },
   searchingIndicator: {
     marginLeft: spacing.sm,
+    alignSelf: 'center',
   },
   section: {
     padding: spacing.md,
@@ -888,7 +888,9 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xl,
     fontWeight: fontWeight.bold,
     color: colors.white,
-    marginBottom: spacing.md,
+    marginBottom: 0,
+    lineHeight: fontSize.xl * 1.2,
+    paddingVertical: 2,
   },
   errorContainer: {
     margin: spacing.md,
@@ -1021,11 +1023,13 @@ const styles = StyleSheet.create({
   },
   sectionHeaderRow: {
     flexDirection: 'row',
+    justifyContent: 'flex-start',
     alignItems: 'center',
     marginBottom: spacing.md,
   },
   inlineLoader: {
     marginLeft: spacing.sm,
+    alignSelf: 'center',
   },
   fadedContent: {
     opacity: 0.7,

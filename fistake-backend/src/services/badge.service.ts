@@ -80,7 +80,6 @@ export const initializeBadges = async () => {
 
     if (count === 0) {
       await BadgeModel.insertMany(predefinedBadges);
-      console.log(`Initialized ${predefinedBadges.length} badges`);
     }
   } catch (error) {
     console.error("Error initializing badges:", error);
@@ -127,11 +126,6 @@ export const checkAndAwardBadges = async (userId: string) => {
 
     // Save user if they earned new badges
     if (newBadges.length > 0) {
-      console.log(
-        `Awarded ${newBadges.length} new badges to ${
-          user.username
-        }: ${newBadges.join(", ")}`
-      );
       await user.save();
     }
 

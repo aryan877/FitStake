@@ -16,12 +16,7 @@ export function useFrameworkReady() {
 
     setTimeout(() => {
       try {
-        if (typeof global.crypto?.randomUUID === 'function')
-          console.log(
-            'Crypto functions initialized successfully',
-            global.crypto.randomUUID()
-          );
-        setIsReady(true);
+        if (typeof global.crypto?.randomUUID === 'function') setIsReady(true);
       } catch (error) {
         console.error('Framework initialization error:', error);
         setIsReady(true);

@@ -330,11 +330,13 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingBottom: spacing.xl,
   },
   loadingText: {
     marginTop: spacing.md,
     color: colors.gray[300],
     fontSize: fontSize.md,
+    textAlign: 'center',
   },
   listContent: {
     padding: spacing.md,

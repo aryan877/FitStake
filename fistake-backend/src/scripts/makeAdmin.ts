@@ -41,9 +41,6 @@ mongoose
       user.isAdmin = true;
       await user.save();
 
-      console.log(
-        `Success! User ${user.username} (${user.walletAddress}) is now an admin.`
-      );
       process.exit(0);
     } catch (error) {
       console.error("Error making user an admin:", error);
