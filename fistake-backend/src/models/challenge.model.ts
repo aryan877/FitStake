@@ -72,12 +72,10 @@ const ChallengeSchema: Schema = new Schema(
     challengeId: {
       type: String,
       required: true,
-      unique: true,
     },
     solanaChallengePda: {
       type: String,
       required: true,
-      unique: true,
     },
     solanaVaultPda: {
       type: String,
