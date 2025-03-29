@@ -56,6 +56,29 @@ The mobile app allows users to:
 - Stake SOL on challenges
 - Monitor progress and claim rewards
 
+### Privy Configuration
+
+Both the mobile app and backend require Privy API keys for authentication:
+
+#### Mobile App (.env.local)
+
+```
+EXPO_PUBLIC_PRIVY_APP_ID=your_privy_app_id
+EXPO_PUBLIC_PRIVY_CLIENT_ID=your_privy_client_id
+```
+
+#### Backend (.env)
+
+```
+PRIVY_APP_ID=your_privy_app_id
+PRIVY_SECRET=your_privy_secret_key
+PRIVY_VERIFICATION_KEY="-----BEGIN PUBLIC KEY-----
+Your Privy verification public key goes here
+-----END PUBLIC KEY-----"
+```
+
+You can obtain these credentials by signing up at [Privy.io](https://privy.io) and creating a new application.
+
 ### Running the App
 
 ```bash
