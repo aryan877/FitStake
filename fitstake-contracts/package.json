@@ -5,9 +5,10 @@
   "scripts": {
     "test": "anchor test",
     "build": "anchor build",
-    "deploy": "ANCHOR_WALLET=keypair.json ANCHOR_PROVIDER_URL=https://api.devnet.solana.com anchor deploy",
-    "copy-idl": "mkdir -p ../fitstake-expo/idl ../fistake-backend/src/idl && cp target/idl/accountability.json ../fitstake-expo/idl/ && cp target/idl/accountability.json ../fistake-backend/src/idl/",
-    "copy-keypair": "mkdir -p ../fistake-backend/src/config && cp keypair.json ../fistake-backend/src/config/",
+    "deploy": "ANCHOR_WALLET=$(pwd)/keypair.json ANCHOR_PROVIDER_URL=https://api.devnet.solana.com anchor deploy",
+    "deploy-with-authority": "ANCHOR_WALLET=$(pwd)/keypair.json ANCHOR_PROVIDER_URL=https://api.devnet.solana.com anchor deploy --provider.wallet keypair.json --program-keypair target/deploy/accountability-keypair.json",
+    "copy-idl": "mkdir -p ../fitstake-expo/idl ../fistake-backend/src/idl && cp target/idl/accountability.json ../fitstake-expo/idl/ && cp target/idl/accountability.json ../fistake-backend/src/idl/ || echo 'IDL copy failed, but continuing'",
+    "copy-keypair": "mkdir -p ../fistake-backend/src/config && cp keypair.json ../fistake-backend/src/config/ || echo 'Keypair copy failed, but continuing'",
     "workflow": "./build-deploy-copy.sh"
   },
   "dependencies": {

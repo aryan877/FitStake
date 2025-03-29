@@ -84,18 +84,158 @@ fi
 
 # Step 2: Deploy contract
 echo -e "\n${GREEN}Step 2: Deploying the contract with keypair.json...${NC}"
+# Make sure the ANCHOR_WALLET environment variable is correctly set
+export ANCHOR_WALLET=$(pwd)/keypair.json
 npm run deploy
 if [ $? -ne 0 ]; then
-    echo -e "${RED}Error: Deployment failed.${NC}"
-    echo -e "${YELLOW}This could be due to insufficient SOL in your keypair.${NC}"
-    echo -e "${YELLOW}Try running 'solana airdrop 2 $PUBKEY' and deploy again.${NC}"
-    exit 1
+    echo -e "${RED}Deployment encountered an issue. Attempting alternative approach...${NC}"
+    
+    # Get the program ID from target/deploy
+    if [ -f "target/deploy/accountability-keypair.json" ]; then
+        PROGRAM_ID=$(solana address -k target/deploy/accountability-keypair.json)
+        echo -e "${YELLOW}Trying to deploy with explicit program ID: ${PROGRAM_ID}${NC}"
+        
+        # Deploy using solana CLI directly
+        solana program deploy --program-id target/deploy/accountability-keypair.json \
+                              --keypair keypair.json \
+                              target/deploy/accountability.so
+        
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}Both deployment methods failed.${NC}"
+            echo -e "${YELLOW}Possible issues:${NC}"
+            echo -e "${YELLOW}1. Insufficient SOL in your keypair. Try 'solana airdrop 2 $PUBKEY'${NC}"
+            echo -e "${YELLOW}2. Program already exists with different authority${NC}"
+            echo -e "${YELLOW}3. Network connection issues${NC}"
+            
+            # Ask user if they want to continue with the rest of the script
+            echo -e "${YELLOW}Do you want to continue with the rest of the script? (y/n)${NC}"
+            read -r continue_script
+            
+            if [[ "$continue_script" =~ ^[Nn]$ ]]; then
+                exit 1
+            fi
+        else
+            echo -e "${GREEN}✓ Contract deployed successfully using alternative method.${NC}"
+        fi
+    else
+        echo -e "${RED}Cannot find program keypair at target/deploy/accountability-keypair.json${NC}"
+        
+        # Ask user if they want to continue with the rest of the script
+        echo -e "${YELLOW}Do you want to continue with the rest of the script? (y/n)${NC}"
+        read -r continue_script
+        
+        if [[ "$continue_script" =~ ^[Nn]$ ]]; then
+            exit 1
+        fi
+    fi
+else
+    echo -e "${GREEN}✓ Contract deployed successfully.${NC}"
 fi
-echo -e "${GREEN}✓ Contract deployed successfully.${NC}"
 
 # Get the program ID
 PROGRAM_ID=$(solana address -k target/deploy/accountability-keypair.json)
 echo -e "\n${GREEN}Program ID: ${YELLOW}$PROGRAM_ID${NC}"
+
+# Inject the program ID into the IDL file
+echo -e "\n${GREEN}Injecting program ID into IDL file...${NC}"
+
+# Check if jq is installed
+if ! command -v jq &> /dev/null; then
+    echo -e "${YELLOW}jq is not installed. Attempting to install it...${NC}"
+    if command -v brew &> /dev/null; then
+        brew install jq
+    elif command -v apt-get &> /dev/null; then
+        sudo apt-get update && sudo apt-get install -y jq
+    elif command -v yum &> /dev/null; then
+        sudo yum install -y jq
+    else
+        echo -e "${YELLOW}Could not install jq automatically. Will use sed instead.${NC}"
+    fi
+fi
+
+# Update the IDL file with the program ID
+if [ -f "target/idl/accountability.json" ]; then
+    # Try with jq first if available
+    if command -v jq &> /dev/null; then
+        # Create a temporary file with metadata added
+        TMP_FILE=$(mktemp)
+        jq --arg address "$PROGRAM_ID" '. + {"metadata": {"address": $address}}' target/idl/accountability.json > "$TMP_FILE"
+        
+        if [ $? -eq 0 ]; then
+            mv "$TMP_FILE" target/idl/accountability.json
+            echo -e "${GREEN}✓ Successfully updated IDL with program ID using jq.${NC}"
+        else
+            echo -e "${YELLOW}Failed to update IDL with jq. Trying alternate method...${NC}"
+            # Fallback to Node.js if installed
+            if command -v node &> /dev/null; then
+                node -e "
+                const fs = require('fs');
+                const idl = JSON.parse(fs.readFileSync('target/idl/accountability.json', 'utf8'));
+                idl.metadata = { address: '$PROGRAM_ID' };
+                fs.writeFileSync('target/idl/accountability.json', JSON.stringify(idl, null, 2));
+                console.log('Successfully updated IDL with program ID using Node.js');
+                "
+                if [ $? -eq 0 ]; then
+                    echo -e "${GREEN}✓ Successfully updated IDL with program ID using Node.js.${NC}"
+                else
+                    echo -e "${YELLOW}Failed to update IDL with Node.js. Trying with sed...${NC}"
+                    # Last resort: use sed
+                    sed -i.bak '1s/^{/{"metadata":{"address":"'$PROGRAM_ID'"},/' target/idl/accountability.json
+                    if [ $? -eq 0 ]; then
+                        rm -f target/idl/accountability.json.bak
+                        echo -e "${GREEN}✓ Successfully updated IDL with program ID using sed.${NC}"
+                    else
+                        echo -e "${RED}All methods to update IDL failed. Please add program ID manually.${NC}"
+                    fi
+                fi
+            else
+                # Try with sed directly
+                sed -i.bak '1s/^{/{"metadata":{"address":"'$PROGRAM_ID'"},/' target/idl/accountability.json
+                if [ $? -eq 0 ]; then
+                    rm -f target/idl/accountability.json.bak
+                    echo -e "${GREEN}✓ Successfully updated IDL with program ID using sed.${NC}"
+                else
+                    echo -e "${RED}Failed to update IDL with program ID. Please add it manually.${NC}"
+                fi
+            fi
+        fi
+    else
+        # No jq, try with Node.js if available
+        if command -v node &> /dev/null; then
+            node -e "
+            const fs = require('fs');
+            const idl = JSON.parse(fs.readFileSync('target/idl/accountability.json', 'utf8'));
+            idl.metadata = { address: '$PROGRAM_ID' };
+            fs.writeFileSync('target/idl/accountability.json', JSON.stringify(idl, null, 2));
+            console.log('Successfully updated IDL with program ID using Node.js');
+            "
+            if [ $? -eq 0 ]; then
+                echo -e "${GREEN}✓ Successfully updated IDL with program ID using Node.js.${NC}"
+            else
+                echo -e "${YELLOW}Failed to update IDL with Node.js. Trying with sed...${NC}"
+                # Last resort: use sed
+                sed -i.bak '1s/^{/{"metadata":{"address":"'$PROGRAM_ID'"},/' target/idl/accountability.json
+                if [ $? -eq 0 ]; then
+                    rm -f target/idl/accountability.json.bak
+                    echo -e "${GREEN}✓ Successfully updated IDL with program ID using sed.${NC}"
+                else
+                    echo -e "${RED}All methods to update IDL failed. Please add program ID manually.${NC}"
+                fi
+            fi
+        else
+            # Try with sed directly
+            sed -i.bak '1s/^{/{"metadata":{"address":"'$PROGRAM_ID'"},/' target/idl/accountability.json
+            if [ $? -eq 0 ]; then
+                rm -f target/idl/accountability.json.bak
+                echo -e "${GREEN}✓ Successfully updated IDL with program ID using sed.${NC}"
+            else
+                echo -e "${RED}Failed to update IDL with program ID. Please add it manually.${NC}"
+            fi
+        fi
+    fi
+else
+    echo -e "${RED}IDL file not found at target/idl/accountability.json${NC}"
+fi
 
 # Verify upgrade authority
 echo -e "\n${GREEN}Verifying upgrade authority...${NC}"
