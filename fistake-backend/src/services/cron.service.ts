@@ -10,22 +10,12 @@ import badgeService from "./badge.service";
 // Load IDL
 let idl: any;
 try {
-  // First try to load from local directory
   const idlFile = path.resolve(__dirname, "../idl/accountability.json");
   idl = JSON.parse(fs.readFileSync(idlFile, "utf-8"));
 } catch (error) {
-  try {
-    // Fall back to the contracts directory
-    const idlFile = path.resolve(
-      __dirname,
-      "../../../fitstake-contracts/target/idl/accountability.json"
-    );
-    idl = JSON.parse(fs.readFileSync(idlFile, "utf-8"));
-  } catch (error) {
-    console.error("Error loading IDL from both locations:", error);
-    console.error("Contract verification will not work!");
-    idl = null;
-  }
+  console.error("Error loading IDL:", error);
+  console.error("Contract verification will not work!");
+  idl = null;
 }
 
 // Connection to Solana devnet
@@ -37,25 +27,14 @@ const PROGRAM_ID = idl ? new PublicKey(idl.metadata.address) : null;
 // Load keypair for admin operations
 let adminKeypair: Keypair;
 try {
-  // First try to load from config directory
   const keypairFile = path.resolve(__dirname, "../config/keypair.json");
   const keypairData = JSON.parse(fs.readFileSync(keypairFile, "utf-8"));
   adminKeypair = Keypair.fromSecretKey(new Uint8Array(keypairData));
 } catch (error) {
-  try {
-    // Fall back to the contracts directory
-    const keypairFile = path.resolve(
-      __dirname,
-      "../../../fitstake-contracts/keypair.json"
-    );
-    const keypairData = JSON.parse(fs.readFileSync(keypairFile, "utf-8"));
-    adminKeypair = Keypair.fromSecretKey(new Uint8Array(keypairData));
-  } catch (error) {
-    console.error("Error loading admin keypair:", error);
-    // Fallback to a new keypair for development only
-    adminKeypair = Keypair.generate();
-    console.warn("Using generated keypair - DO NOT USE IN PRODUCTION!");
-  }
+  console.error("Error loading admin keypair:", error);
+  // Fallback to a new keypair for development only
+  adminKeypair = Keypair.generate();
+  console.warn("Using generated keypair - DO NOT USE IN PRODUCTION!");
 }
 
 // Initialize cron jobs
