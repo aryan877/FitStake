@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { authApi } from '../../services/api';
 import theme from '../../theme';
+import SolanaPriceDisplay from '../SolanaPriceDisplay';
 
 const { colors, spacing, borderRadius, fontSize, fontWeight } = theme;
 
@@ -319,20 +320,31 @@ const CreateChallengeModal = ({
               </View>
             )}
 
-            <Text style={styles.inputLabel}>Stake Amount (SOL)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="0.1"
-              placeholderTextColor={colors.gray[500]}
-              keyboardType="decimal-pad"
-              value={challenge.stakeAmount}
-              onChangeText={(text) => {
-                // Allow valid decimal input
-                if (text === '' || /^\d*\.?\d*$/.test(text)) {
-                  onChange('stakeAmount', text);
-                }
-              }}
-            />
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Stake Amount (SOL)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="0.1"
+                placeholderTextColor={colors.gray[500]}
+                keyboardType="decimal-pad"
+                value={challenge.stakeAmount}
+                onChangeText={(text) => {
+                  // Allow valid decimal input
+                  if (text === '' || /^\d*\.?\d*$/.test(text)) {
+                    onChange('stakeAmount', text);
+                  }
+                }}
+              />
+              {challenge.stakeAmount && Number(challenge.stakeAmount) > 0 && (
+                <View style={styles.usdEquivalent}>
+                  <SolanaPriceDisplay
+                    solAmount={Number(challenge.stakeAmount)}
+                    variant="secondary"
+                    showSolAmount={false}
+                  />
+                </View>
+              )}
+            </View>
 
             <Text style={styles.inputLabel}>Step Goal</Text>
             <TextInput
@@ -716,6 +728,10 @@ const styles = StyleSheet.create({
   },
   placeholderText: {
     color: colors.gray[500],
+  },
+  usdEquivalent: {
+    marginTop: 2,
+    alignItems: 'flex-start',
   },
 });
 

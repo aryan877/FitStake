@@ -512,6 +512,7 @@ export default function ChallengeDetailsScreen() {
             goalValue={challenge.goal.value}
             goalUnit={challenge.goal.unit}
             stakeAmount={formatSolAmount(challenge.stakeAmount)}
+            solAmount={challenge.stakeAmount / LAMPORTS_PER_SOL}
             token={challenge.token}
             participantCount={challenge.participantCount}
             maxParticipants={challenge.maxParticipants}

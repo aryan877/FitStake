@@ -3,6 +3,7 @@ import { CreateChallengeCardProps } from '@/types';
 import { Plus, Trophy } from 'lucide-react-native';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import SolanaPriceDisplay from '../SolanaPriceDisplay';
 
 const { colors, spacing, borderRadius, fontSize, fontWeight } = theme;
 
@@ -22,6 +23,14 @@ const CreateChallengeCard = ({ onPress }: CreateChallengeCardProps) => {
           <Text style={styles.createChallengeText}>
             Start a new fitness challenge with friends
           </Text>
+          <View style={styles.priceContainer}>
+            <SolanaPriceDisplay
+              compact={true}
+              variant="secondary"
+              showSolAmount={false}
+              showUsdEquivalent={true}
+            />
+          </View>
         </View>
       </View>
       <View style={styles.createButtonContainer}>
@@ -67,6 +76,10 @@ const styles = StyleSheet.create({
   createChallengeText: {
     color: colors.gray[400],
     fontSize: fontSize.sm,
+    marginBottom: spacing.xs,
+  },
+  priceContainer: {
+    marginTop: spacing.xs,
   },
   createButtonContainer: {
     alignItems: 'center',

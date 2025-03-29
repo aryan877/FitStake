@@ -15,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import EmptyState from '../components/EmptyState';
+import SolanaPriceDisplay from '../components/SolanaPriceDisplay';
 import { challengeApi } from '../services/api';
 import theme from '../theme';
 import { formatCountdown } from '../utils/dateFormatting';
@@ -138,6 +139,9 @@ export default function MyChallengesScreen() {
         ? `${item.description.substring(0, descriptionCharLimit)}...`
         : item.description;
 
+    // Calculate SOL amount in decimal
+    const solAmount = item.stakeAmount / LAMPORTS_PER_SOL;
+
     return (
       <Pressable
         style={styles.challengeCard}
@@ -177,10 +181,18 @@ export default function MyChallengesScreen() {
             </Text>
           </View>
 
-          <View style={styles.detailItem}>
-            <Text style={styles.detailText}>
-              Stake: {formatSolAmount(item.stakeAmount)} {item.token}
-            </Text>
+          <View style={styles.stakeContainer}>
+            <View style={styles.detailItem}>
+              <Text style={styles.detailText}>
+                Stake: {formatSolAmount(item.stakeAmount)} {item.token}
+              </Text>
+            </View>
+            <SolanaPriceDisplay
+              solAmount={solAmount}
+              compact={true}
+              variant="dark"
+              showSolAmount={false}
+            />
           </View>
 
           <Text style={styles.timeRemaining}>
@@ -411,5 +423,9 @@ const styles = StyleSheet.create({
     color: colors.accent.primary,
     fontSize: fontSize.xs,
     fontWeight: fontWeight.medium,
+  },
+  stakeContainer: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
   },
 });

@@ -15,6 +15,7 @@ import {
   ToastAndroid,
   View,
 } from 'react-native';
+import SolanaPriceDisplay from '../SolanaPriceDisplay';
 
 const { colors, spacing, borderRadius, fontSize, fontWeight } = theme;
 
@@ -50,6 +51,9 @@ const ChallengeCard = ({
     challenge.description.length > descriptionCharLimit
       ? `${challenge.description.substring(0, descriptionCharLimit)}...`
       : challenge.description;
+
+  // Calculate SOL amount in decimal
+  const solAmount = challenge.stakeAmount / LAMPORTS_PER_SOL;
 
   // Update countdown every second
   useEffect(() => {
@@ -118,9 +122,17 @@ const ChallengeCard = ({
 
         <View style={styles.detailItem}>
           <TrendingUp size={12} color={colors.gray[400]} />
-          <Text style={styles.detailText}>
-            {formatSolAmount(challenge.stakeAmount)} {challenge.token}
-          </Text>
+          <View style={styles.stakeContainer}>
+            <Text style={styles.detailText}>
+              {formatSolAmount(challenge.stakeAmount)} {challenge.token}
+            </Text>
+            <SolanaPriceDisplay
+              solAmount={solAmount}
+              compact={true}
+              variant="dark"
+              showSolAmount={false}
+            />
+          </View>
         </View>
 
         <View style={styles.detailItem}>
@@ -209,6 +221,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+  },
+  stakeContainer: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
   },
   detailText: {
     color: colors.gray[300],

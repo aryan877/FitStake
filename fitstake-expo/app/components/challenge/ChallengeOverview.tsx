@@ -2,6 +2,7 @@ import theme from '@/app/theme';
 import { CalendarDays, Copy, Globe, Lock } from 'lucide-react-native';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import SolanaPriceDisplay from '../SolanaPriceDisplay';
 
 const { colors, spacing, borderRadius, fontSize, fontWeight, shadows } = theme;
 
@@ -9,6 +10,7 @@ interface ChallengeOverviewProps {
   goalValue: number;
   goalUnit: string;
   stakeAmount: string;
+  solAmount?: number;
   token: string;
   participantCount: number;
   maxParticipants: number;
@@ -25,6 +27,7 @@ export const ChallengeOverview = ({
   goalValue,
   goalUnit,
   stakeAmount,
+  solAmount,
   token,
   participantCount,
   maxParticipants,
@@ -59,9 +62,20 @@ export const ChallengeOverview = ({
         </View>
         <View style={styles.detailItem}>
           <Text style={styles.detailLabel}>Stake</Text>
-          <Text style={styles.detailValue} numberOfLines={1}>
-            {stakeAmount} {token}
-          </Text>
+          <View>
+            <Text style={styles.detailValue} numberOfLines={1}>
+              {stakeAmount} {token}
+            </Text>
+            {solAmount !== undefined && (
+              <View style={styles.usdEquivalent}>
+                <SolanaPriceDisplay
+                  solAmount={solAmount}
+                  variant="secondary"
+                  showSolAmount={false}
+                />
+              </View>
+            )}
+          </View>
         </View>
         <View style={styles.detailItem}>
           <Text style={styles.detailLabel}>Participants</Text>
@@ -327,6 +341,9 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xs,
     marginTop: spacing.xs,
     marginLeft: spacing.md,
+  },
+  usdEquivalent: {
+    marginTop: 2,
   },
 });
 
