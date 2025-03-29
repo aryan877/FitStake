@@ -1,10 +1,6 @@
 import { useEffect, useState } from 'react';
 import { LogBox } from 'react-native';
-import { Window } from '../types';
-
-declare global {
-  
-}
+declare global {}
 
 export function useFrameworkReady() {
   const [isReady, setIsReady] = useState(false);

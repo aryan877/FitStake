@@ -13,44 +13,20 @@ export const getUserProfile = async (
   next: NextFunction
 ) => {
   try {
-    if (!req.user) {
-      return next(new ApiError(401, "Authentication required"));
-    }
+    if (!req.user) return next(new ApiError(401, "Authentication required"));
 
     const { did } = req.user;
-
-    // Find user by Privy ID
     const user = await UserModel.findOne({ privyId: did });
+    if (!user) return next(new ApiError(404, "User not found"));
 
-    if (!user) {
-      return next(new ApiError(404, "User not found"));
-    }
-
-    // Get badge details if user has badges
+    // Get badge details
     let badgesWithDetails: BadgeWithDetails[] = [];
-
     if (user.badges && user.badges.length > 0) {
-      // Log badge information for debugging
-      console.log(
-        `User ${user.username} has ${user.badges.length} badges in database`
-      );
-
-      // Get all badge IDs
       const badgeIds = user.badges.map((badge) => badge.badgeId);
-      console.log("Badge IDs for user:", badgeIds);
-
-      // Get badge details from badge model
       const badgeDetails = await BadgeModel.find({ id: { $in: badgeIds } });
-      console.log(`Found ${badgeDetails.length} badge details from BadgeModel`);
 
-      // Map badges with their details
       badgesWithDetails = user.badges.map((userBadge) => {
         const badge = badgeDetails.find((b) => b.id === userBadge.badgeId);
-        if (!badge) {
-          console.log(
-            `Warning: Badge details not found for ID ${userBadge.badgeId}`
-          );
-        }
         return {
           id: userBadge.badgeId,
           name: badge?.name || "Unknown Badge",
@@ -61,11 +37,8 @@ export const getUserProfile = async (
           earnedAt: userBadge.earnedAt,
         };
       });
-    } else {
-      console.log(`User ${user.username} has no badges`);
     }
 
-    // Construct the response
     const profileData = {
       privyId: user.privyId,
       walletAddress: user.walletAddress,
@@ -82,10 +55,6 @@ export const getUserProfile = async (
       },
       badges: badgesWithDetails,
     };
-
-    console.log(
-      `Returning profile for ${user.username} with ${badgesWithDetails.length} badges`
-    );
 
     return res
       .status(200)
@@ -104,19 +73,15 @@ export const createOrUpdateUser = async (
   next: NextFunction
 ) => {
   try {
-    const { walletAddress, username } = req.body;
-
-    if (!req.user) {
-      return next(new ApiError(401, "Authentication required"));
-    }
+    if (!req.user) return next(new ApiError(401, "Authentication required"));
 
     const { did } = req.user;
+    const { walletAddress, username } = req.body;
 
-    if (!walletAddress) {
+    if (!walletAddress)
       return next(new ApiError(400, "Wallet address is required"));
-    }
 
-    // Validate username if provided
+    // Validate username
     if (username && !validateUsername(username)) {
       return next(
         new ApiError(
@@ -126,38 +91,33 @@ export const createOrUpdateUser = async (
       );
     }
 
-    // Generate a random username if not provided
     const generatedUsername = username || `user_${uuidv4().substring(0, 8)}`;
-
-    // Check if user exists
     let user = await UserModel.findOne({ privyId: did });
 
     if (user) {
-      // Update fields if provided
+      // Update existing user
       if (user.walletAddress !== walletAddress) {
         user.walletAddress = walletAddress;
       }
+
       if (username && user.username !== username) {
-        // Check if new username is already taken by another user
         const existingUser = await UserModel.findOne({
           username,
           privyId: { $ne: did },
         });
 
-        if (existingUser) {
+        if (existingUser)
           return next(new ApiError(400, "Username already taken"));
-        }
-
         user.username = username;
       }
       await user.save();
     } else {
-      // Create new user with random username if not provided
+      // Create new user
       user = await UserModel.create({
         privyId: did,
         walletAddress,
         username: generatedUsername,
-        isAdmin: false, // Default to non-admin
+        isAdmin: false,
         stats: {
           totalStepCount: 0,
           challengesCompleted: 0,
@@ -203,7 +163,6 @@ export const checkUsername = async (
       return next(new ApiError(400, "Username is required"));
     }
 
-    // Validate username format
     if (!validateUsername(username)) {
       return next(
         new ApiError(
@@ -213,7 +172,6 @@ export const checkUsername = async (
       );
     }
 
-    // Check if username exists
     const existingUser = await UserModel.findOne({ username });
 
     return res.status(200).json(
@@ -238,19 +196,15 @@ export const updateUsername = async (
   next: NextFunction
 ) => {
   try {
-    const { username } = req.body;
-
-    if (!req.user) {
-      return next(new ApiError(401, "Authentication required"));
-    }
+    if (!req.user) return next(new ApiError(401, "Authentication required"));
 
     const { did } = req.user;
+    const { username } = req.body;
 
     if (!username || typeof username !== "string") {
       return next(new ApiError(400, "Username is required"));
     }
 
-    // Validate username format
     if (!validateUsername(username)) {
       return next(
         new ApiError(
@@ -260,14 +214,10 @@ export const updateUsername = async (
       );
     }
 
-    // Find user by Privy ID
     const user = await UserModel.findOne({ privyId: did });
+    if (!user) return next(new ApiError(404, "User not found"));
 
-    if (!user) {
-      return next(new ApiError(404, "User not found"));
-    }
-
-    // No change needed if username is the same
+    // No change needed
     if (user.username === username) {
       return res.status(200).json(
         new ApiResponse(
@@ -287,11 +237,8 @@ export const updateUsername = async (
       privyId: { $ne: did },
     });
 
-    if (existingUser) {
-      return next(new ApiError(400, "Username already taken"));
-    }
+    if (existingUser) return next(new ApiError(400, "Username already taken"));
 
-    // Update username
     user.username = username;
     await user.save();
 

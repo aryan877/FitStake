@@ -1,11 +1,11 @@
 import mongoose, { Document, Schema } from "mongoose";
 
 export interface Challenge extends Document {
-  challengeId: string; // Unique ID from smart contract
-  solanaChallengePda: string; // Challenge PDA on Solana
-  solanaVaultPda: string; // Vault PDA that holds staked tokens
-  authority: string; // Challenge creator's wallet address
-  admin: string; // Admin address with special privileges
+  challengeId: string;
+  solanaChallengePda: string;
+  solanaVaultPda: string;
+  authority: string;
+  admin: string;
 
   // Challenge details
   title: string;
@@ -17,58 +17,54 @@ export interface Challenge extends Document {
   };
 
   // Time periods
-  startTime: number; // Unix timestamp from smart contract
-  endTime: number; // Unix timestamp from smart contract
+  startTime: number;
+  endTime: number;
 
-  // Stake details (from smart contract)
-  stakeAmount: number; // Amount in lamports
+  // Stake details
+  stakeAmount: number;
   minParticipants: number;
   maxParticipants: number;
   participantCount: number;
-  totalStake: number; // Total tokens staked
-  token: string; // Token mint address
+  totalStake: number;
+  token: string;
 
-  // Status flags (from smart contract)
+  // Status flags
   isActive: boolean;
   isCompleted: boolean;
   onChainVerificationComplete: boolean;
+  isPublic: boolean;
 
   // Participants
   participants: {
     walletAddress: string;
-    did?: string; // Optional user DID if mapped in our system
+    did?: string;
     stakeAmount: number;
-    completed: boolean; // From smart contract
-    claimed: boolean; // From smart contract
+    completed: boolean;
+    claimed: boolean;
     joinedAt: Date;
-    // Local data for app experience
     healthData?: {
       date: string;
       steps: number;
       lastUpdated: Date;
     }[];
-    progress?: number; // Percentage of goal complete
+    progress?: number;
   }[];
 
-  // Webhook tracking
-  lastIndexedBlock: number;
+  // Transaction tracking
   lastIndexedTransaction: string;
   lastEventTimestamp: Date;
 
-  // Used for UI and reporting
+  // Used for UI
   successRate?: number;
 
   // Timestamps
   createdAt: Date;
   updatedAt: Date;
-
-  // New field
-  isPublic: boolean;
 }
 
 const ChallengeSchema: Schema = new Schema(
   {
-    // Smart contract data
+    // Contract data
     challengeId: {
       type: String,
       required: true,
@@ -95,12 +91,12 @@ const ChallengeSchema: Schema = new Schema(
       type: String,
       required: true,
       trim: true,
-      maxlength: 50, // Max title length
+      maxlength: 50,
     },
     description: {
       type: String,
       required: true,
-      maxlength: 250, // Max description length
+      maxlength: 250,
     },
     type: {
       type: String,
@@ -120,11 +116,11 @@ const ChallengeSchema: Schema = new Schema(
 
     // Time periods
     startTime: {
-      type: Number, // Unix timestamp
+      type: Number,
       required: true,
     },
     endTime: {
-      type: Number, // Unix timestamp
+      type: Number,
       required: true,
     },
 
@@ -221,11 +217,7 @@ const ChallengeSchema: Schema = new Schema(
       },
     ],
 
-    // Webhook tracking
-    lastIndexedBlock: {
-      type: Number,
-      default: 0,
-    },
+    // Transaction tracking
     lastIndexedTransaction: {
       type: String,
     },
@@ -246,30 +238,25 @@ const ChallengeSchema: Schema = new Schema(
   }
 );
 
-// Virtual for calculating success rate
+// Calculate success rate
 ChallengeSchema.virtual("successRate").get(function (this: Challenge) {
   const completedParticipants = this.participants.filter(
     (p) => p.completed
   ).length;
-  if (this.participantCount === 0) return 0;
-  return (completedParticipants / this.participantCount) * 100;
+  return this.participantCount === 0
+    ? 0
+    : (completedParticipants / this.participantCount) * 100;
 });
 
-// Index for efficient queries
+// Indexes for efficient queries
 ChallengeSchema.index({ challengeId: 1 }, { unique: true });
 ChallengeSchema.index({ solanaChallengePda: 1 }, { unique: true });
-ChallengeSchema.index({ "participants.walletAddress": 1 }); // For user challenge lookups
-ChallengeSchema.index({ isCompleted: 1, startTime: 1 }); // For status + time based queries
-ChallengeSchema.index({ authority: 1 }); // For creator lookups
+ChallengeSchema.index({ "participants.walletAddress": 1 });
+ChallengeSchema.index({ isCompleted: 1, startTime: 1 });
+ChallengeSchema.index({ authority: 1 });
+ChallengeSchema.index({ isCompleted: 1, createdAt: -1, type: 1 });
 
-// Compound index for sorting and filtering
-ChallengeSchema.index({
-  isCompleted: 1,
-  createdAt: -1,
-  type: 1,
-});
-
-// Text search index with weights
+// Text search index
 ChallengeSchema.index(
   {
     challengeId: "text",
@@ -278,9 +265,9 @@ ChallengeSchema.index(
   },
   {
     weights: {
-      challengeId: 10, // Highest priority for exact ID matches
-      title: 5, // Medium priority for title matches
-      description: 1, // Lower priority for description matches
+      challengeId: 10,
+      title: 5,
+      description: 1,
     },
     name: "search_index",
   }

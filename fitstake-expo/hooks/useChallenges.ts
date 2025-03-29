@@ -19,10 +19,8 @@ import IDL from '../idl/accountability.json';
 const SOLANA_RPC_URL =
   process.env.EXPO_PUBLIC_SOLANA_RPC_URL || 'https://api.devnet.solana.com';
 
-// Accountability program ID
-const PROGRAM_ID = new PublicKey(
-  '5hTA47XZPkJK7d6JrCEcmUaDbt6bgxNjgUDbRBo593er'
-);
+// Get program ID from IDL metadata
+const PROGRAM_ID = new PublicKey(IDL.metadata.address);
 
 /**
  * Creates a wallet adapter for Anchor
@@ -82,9 +80,7 @@ export const useChallenges = () => {
     });
 
     // Create program
-    const program = new Program(IDL as any, PROGRAM_ID, provider);
-
-    return program;
+    return new Program(IDL as any, PROGRAM_ID, provider);
   }, [walletAddress, connection]);
 
   /**

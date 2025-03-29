@@ -2,44 +2,63 @@ import { getAccessToken } from '@privy-io/expo';
 import axios from 'axios';
 import { StepsData } from '../../types';
 
-// Get backend URL from environment variables
+// API configuration
 const BACKEND_URL =
   process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:5000/api';
 
-// Create axios instance with default config
+// Create axios instance
 const api = axios.create({
   baseURL: BACKEND_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  headers: { 'Content-Type': 'application/json' },
 });
 
-// Add an interceptor to add authentication token to requests
+// Add auth token to requests
 api.interceptors.request.use(
   async (config) => {
     try {
-      // Get token from Privy
       const token = await getAccessToken();
-
-      // If we have a token, add it to the request
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-
+      if (token) config.headers.Authorization = `Bearer ${token}`;
       return config;
     } catch (error) {
-      console.error('Error adding auth token to request:', error);
+      console.error('Auth token error:', error);
       return config;
     }
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
+
+// Helper to standardize error handling
+const handleApiError = (error: any, context: string) => {
+  console.error(`API Error - ${context}:`, error);
+  throw new Error(error.response?.data?.message || error.message);
+};
+
+interface ChallengeParams {
+  page?: number;
+  limit?: number;
+  type?: string;
+  status?: string;
+  minStake?: number;
+  maxStake?: number;
+  minGoal?: number;
+  maxGoal?: number;
+  minParticipants?: number;
+  maxParticipants?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  searchText?: string;
+  visibility?: string;
+  challengeId?: string;
+}
+
+interface UserChallengeParams {
+  page?: number;
+  limit?: number;
+  status?: string;
+}
 
 // Auth endpoints
 export const authApi = {
-  // Get user profile
   getUserProfile: async () => {
     try {
       const response = await api.get('/auth/user');
@@ -49,7 +68,6 @@ export const authApi = {
     }
   },
 
-  // Create or update user with wallet
   createOrUpdateUser: async (walletAddress: string, username?: string) => {
     try {
       const response = await api.post('/auth/user', {
@@ -62,7 +80,6 @@ export const authApi = {
     }
   },
 
-  // Check if username is available
   checkUsername: async (username: string) => {
     try {
       const response = await api.get('/auth/check-username', {
@@ -74,7 +91,6 @@ export const authApi = {
     }
   },
 
-  // Update username
   updateUsername: async (username: string) => {
     try {
       const response = await api.patch('/auth/user', { username });
@@ -88,7 +104,6 @@ export const authApi = {
 
 // Admin endpoints
 export const adminApi = {
-  // Check if user is an admin
   checkAdminStatus: async () => {
     try {
       const response = await api.get('/admin/check-status');
@@ -103,39 +118,20 @@ export const adminApi = {
 // Challenge endpoints
 export const challengeApi = {
   // Get all challenges with pagination and filters
-  getAll: async (
-    params: {
-      page?: number;
-      limit?: number;
-      type?: string;
-      status?: string;
-      minStake?: number;
-      maxStake?: number;
-      minGoal?: number;
-      maxGoal?: number;
-      minParticipants?: number;
-      maxParticipants?: number;
-      sortBy?: string;
-      sortOrder?: 'asc' | 'desc';
-      searchText?: string;
-      visibility?: string;
-      challengeId?: string;
-    } = {}
-  ) => {
+  getAll: async (params: ChallengeParams = {}) => {
     try {
       const cleanParams: Record<string, any> = {};
 
-      // Handle search text (includes challenge ID, title, and description)
+      // Process text search
       if (params.searchText?.trim()) {
         cleanParams.searchText = params.searchText.trim();
       }
 
-      // Handle status - make sure 'any' is not sent to backend
+      // Process status and visibility
       if (params.status && params.status !== 'any') {
         cleanParams.status = params.status;
       }
 
-      // Handle visibility - make sure valid values are sent
       if (params.visibility) {
         cleanParams.visibility = params.visibility;
       }
@@ -143,17 +139,16 @@ export const challengeApi = {
       // Copy pagination and sorting params
       ['page', 'limit', 'sortBy', 'sortOrder', 'challengeId', 'type'].forEach(
         (key) => {
-          if (params[key as keyof typeof params] !== undefined) {
-            cleanParams[key] = params[key as keyof typeof params];
+          if (params[key as keyof ChallengeParams] !== undefined) {
+            cleanParams[key] = params[key as keyof ChallengeParams];
           }
         }
       );
 
-      // Handle numeric values with validation
-      // All min/max values should be positive numbers
+      // Process numeric parameters
       ['minGoal', 'maxGoal', 'minParticipants', 'maxParticipants'].forEach(
         (key) => {
-          const value = params[key as keyof typeof params];
+          const value = params[key as keyof ChallengeParams];
           if (
             value !== undefined &&
             value !== null &&
@@ -165,31 +160,21 @@ export const challengeApi = {
         }
       );
 
-      // Special handling for stake amounts - convert from SOL to lamports
-      // The backend expects values in lamports (1 SOL = 1,000,000,000 lamports)
-      if (
-        params.minStake !== undefined &&
-        !isNaN(Number(params.minStake)) &&
-        Number(params.minStake) >= 0
-      ) {
-        const lamports = Math.floor(Number(params.minStake) * 1_000_000_000);
-        if (lamports > 0) {
-          cleanParams.minStake = lamports;
+      // Convert SOL to lamports for stake params
+      ['minStake', 'maxStake'].forEach((key) => {
+        const value = params[key as keyof ChallengeParams];
+        if (
+          value !== undefined &&
+          !isNaN(Number(value)) &&
+          Number(value) >= 0
+        ) {
+          const lamports = Math.floor(Number(value) * 1_000_000_000);
+          if (lamports > 0) {
+            cleanParams[key] = lamports;
+          }
         }
-      }
+      });
 
-      if (
-        params.maxStake !== undefined &&
-        !isNaN(Number(params.maxStake)) &&
-        Number(params.maxStake) >= 0
-      ) {
-        const lamports = Math.floor(Number(params.maxStake) * 1_000_000_000);
-        if (lamports > 0) {
-          cleanParams.maxStake = lamports;
-        }
-      }
-
-      console.log('API request params:', cleanParams);
       const response = await api.get('/challenges', { params: cleanParams });
 
       if (!response.data?.success) {
@@ -198,8 +183,7 @@ export const challengeApi = {
 
       return response.data;
     } catch (error: any) {
-      console.error('API Error - getAll challenges:', error);
-      throw new Error(error.response?.data?.message || error.message);
+      return handleApiError(error, 'getAll challenges');
     }
   },
 
@@ -207,33 +191,26 @@ export const challengeApi = {
   getById: async (id: string) => {
     try {
       const response = await api.get(`/challenges/${id}`);
-
       if (!response.data?.success) {
         throw new Error(response.data?.message || 'Failed to fetch challenge');
       }
-
       return response.data;
     } catch (error: any) {
-      console.error(`API Error - getById challenge ${id}:`, error);
-      throw new Error(error.response?.data?.message || error.message);
+      return handleApiError(error, `getById challenge ${id}`);
     }
   },
 
-  // Get challenges for the current user
-  getUserChallenges: async (
-    params: {
-      page?: number;
-      limit?: number;
-      status?: string;
-    } = {}
-  ) => {
+  // Get user's challenges
+  getUserChallenges: async (params: UserChallengeParams = {}) => {
     try {
       const cleanParams: Record<string, any> = {};
 
-      // Handle pagination and status params
-      if (params.page !== undefined) cleanParams.page = params.page;
-      if (params.limit !== undefined) cleanParams.limit = params.limit;
-      if (params.status !== undefined) cleanParams.status = params.status;
+      // Copy valid parameters
+      ['page', 'limit', 'status'].forEach((key) => {
+        if (params[key as keyof UserChallengeParams] !== undefined) {
+          cleanParams[key] = params[key as keyof UserChallengeParams];
+        }
+      });
 
       const response = await api.get('/challenges/user/challenges', {
         params: cleanParams,
@@ -247,8 +224,7 @@ export const challengeApi = {
 
       return response.data;
     } catch (error: any) {
-      console.error('API Error - getUserChallenges:', error);
-      throw new Error(error.response?.data?.message || error.message);
+      return handleApiError(error, 'getUserChallenges');
     }
   },
 
@@ -256,15 +232,12 @@ export const challengeApi = {
   createChallenge: async (data: any) => {
     try {
       const response = await api.post('/challenges', data);
-
       if (!response.data?.success) {
         throw new Error(response.data?.message || 'Failed to create challenge');
       }
-
       return response.data;
     } catch (error: any) {
-      console.error('API Error - createChallenge:', error);
-      throw new Error(error.response?.data?.message || error.message);
+      return handleApiError(error, 'createChallenge');
     }
   },
 
@@ -272,15 +245,12 @@ export const challengeApi = {
   joinChallenge: async (id: string) => {
     try {
       const response = await api.post(`/challenges/${id}/join`);
-
       if (!response.data?.success) {
         throw new Error(response.data?.message || 'Failed to join challenge');
       }
-
       return response.data;
     } catch (error: any) {
-      console.error(`API Error - joinChallenge ${id}:`, error);
-      throw new Error(error.response?.data?.message || error.message);
+      return handleApiError(error, `joinChallenge ${id}`);
     }
   },
 
@@ -304,15 +274,14 @@ export const challengeApi = {
 
       return response.data;
     } catch (error: any) {
-      console.error(`API Error - submitHealthData for challenge ${id}:`, error);
-      throw new Error(error.response?.data?.message || error.message);
+      return handleApiError(error, `submitHealthData for challenge ${id}`);
     }
   },
 
   // Claim rewards for a completed challenge
   claimReward: async (id: string, transactionId: string) => {
     try {
-      const response = await api.post(`/health/challenges/${id}/claim`, {
+      const response = await api.post(`/challenges/${id}/claim`, {
         transactionId,
       });
 
@@ -322,8 +291,7 @@ export const challengeApi = {
 
       return response.data;
     } catch (error: any) {
-      console.error(`API Error - claimReward for challenge ${id}:`, error);
-      throw new Error(error.response?.data?.message || error.message);
+      return handleApiError(error, `claimReward for challenge ${id}`);
     }
   },
 
@@ -333,8 +301,7 @@ export const challengeApi = {
       const response = await api.get(`/health/challenges/${id}/progress`);
       return response.data;
     } catch (error) {
-      console.error(`Error getting progress for challenge ${id}:`, error);
-      throw error;
+      return handleApiError(error, `getProgress for challenge ${id}`);
     }
   },
 };

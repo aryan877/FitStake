@@ -79,7 +79,6 @@ export const initializeBadges = async () => {
     const count = await BadgeModel.countDocuments();
 
     if (count === 0) {
-      console.log("Initializing badges...");
       await BadgeModel.insertMany(predefinedBadges);
       console.log(`Initialized ${predefinedBadges.length} badges`);
     }
@@ -95,10 +94,7 @@ export const checkAndAwardBadges = async (userId: string) => {
   try {
     // Get user with stats
     const user = await UserModel.findById(userId);
-    if (!user || !user.stats) {
-      console.log(`User ${userId} has no stats, skipping badge check`);
-      return [];
-    }
+    if (!user || !user.stats) return [];
 
     // Get all badges
     const allBadges = await BadgeModel.find();
@@ -107,8 +103,6 @@ export const checkAndAwardBadges = async (userId: string) => {
     const userBadgeIds = new Set(
       user.badges?.map((badge) => badge.badgeId) || []
     );
-
-    console.log(`User ${user.username} has ${userBadgeIds.size} badges`);
 
     // New badges to award
     const newBadges: string[] = [];
@@ -122,7 +116,6 @@ export const checkAndAwardBadges = async (userId: string) => {
       const isEligible = checkBadgeCriteria(badge, user.stats);
 
       if (isEligible) {
-        console.log(`Awarding badge ${badge.name} to user ${user.username}`);
         newBadges.push(badge.id);
         user.badges = user.badges || [];
         user.badges.push({
@@ -135,11 +128,11 @@ export const checkAndAwardBadges = async (userId: string) => {
     // Save user if they earned new badges
     if (newBadges.length > 0) {
       console.log(
-        `Saving ${newBadges.length} new badges for user ${user.username}`
+        `Awarded ${newBadges.length} new badges to ${
+          user.username
+        }: ${newBadges.join(", ")}`
       );
       await user.save();
-
-      console.log(`User now has ${(user.badges || []).length} total badges`);
     }
 
     return newBadges;

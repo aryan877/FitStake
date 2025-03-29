@@ -29,159 +29,99 @@ export const getChallenges = async (
       visibility = "public",
     } = req.query;
 
-    console.log("Search params:", req.query);
     const skip = (Number(page) - 1) * Number(limit);
 
-    // Determine sort direction
+    // Build sort options
     const sortDirection = sortOrder === "asc" ? 1 : -1;
     const sortOptions: any = {};
     sortOptions[sortBy as string] = sortDirection;
 
-    // Build query based on filters
+    // Build query
     let query: any = {};
 
-    // Filter by visibility (public/private challenges)
+    // Filter by visibility
     if (visibility === "public") {
       query.isPublic = true;
     } else if (visibility === "private") {
       query.isPublic = false;
-    } else if (visibility === "all") {
-      // Explicitly don't add any visibility filter
-      console.log("Searching across both public and private challenges");
     }
-    // If visibility is not specified, don't add filter for isPublic
 
-    // Search text in title, description, and challengeId
+    // Handle search
     if (searchText) {
       const trimmedSearchText = String(searchText).trim();
 
-      // Only proceed with search if we have actual text after trimming
       if (trimmedSearchText.length > 0) {
-        console.log(`Searching with text: "${trimmedSearchText}"`);
-
-        // First, try to find an exact match for challengeId
+        // Check for exact challengeId match first
         const exactMatch = await Challenge.findOne({
           challengeId: trimmedSearchText,
         });
 
         if (exactMatch) {
-          // If exact match is found, override all other filters to return just this challenge
-          console.log(
-            `Found exact match for challengeId: ${trimmedSearchText}`
-          );
-
-          // Override the query to only search by this challengeId
-          // This ensures the challenge is found regardless of visibility settings
+          // Override all filters for exact match
           query = { challengeId: trimmedSearchText };
-
-          console.log(
-            `Found challenge: ${exactMatch.title} (${
-              exactMatch.isPublic ? "public" : "private"
-            })`
-          );
         } else {
-          // No exact match by challengeId, try pattern matching
-          console.log(`No exact challengeId match for: "${trimmedSearchText}"`);
-
+          // Fallback to pattern matching
           const searchRegex = new RegExp(trimmedSearchText, "i");
-
-          // Use regex to search across multiple fields
           query.$or = [
             { challengeId: { $regex: searchRegex } },
             { title: { $regex: searchRegex } },
             { description: { $regex: searchRegex } },
           ];
 
-          // For multi-word searches, also try text search
+          // Add text search for multi-word queries
           if (
             trimmedSearchText.includes(" ") &&
             trimmedSearchText.length >= 3
           ) {
-            console.log("Also using text search for multi-word query");
-            // We use $or to combine with the existing query
-            if (!query.$or) {
-              query.$or = [];
-            }
-
-            // Add text search as another condition
+            if (!query.$or) query.$or = [];
             query.$or.push({ $text: { $search: trimmedSearchText } });
-
-            // Add relevance score for sorting
             sortOptions.score = { $meta: "textScore" };
           }
         }
       }
     }
 
-    console.log("Final query:", JSON.stringify(query, null, 2));
-    console.log("Sort options:", JSON.stringify(sortOptions, null, 2));
-
-    if (type) {
-      query.type = type;
-    }
+    // Add other filters
+    if (type) query.type = type;
 
     // Status filter
-    if (status === "active") {
-      query.isCompleted = false;
-    } else if (status === "completed") {
-      query.isCompleted = true;
-    }
+    if (status === "active") query.isCompleted = false;
+    else if (status === "completed") query.isCompleted = true;
 
     // Stake amount range filter
     if (minStake || maxStake) {
       query.stakeAmount = {};
       if (minStake) {
-        // Convert from SOL to lamports (1 SOL = 1,000,000,000 lamports)
-        const minStakeLamports = Number(minStake) * LAMPORTS_PER_SOL;
-        query.stakeAmount.$gte = minStakeLamports;
-        console.log(
-          `Converting minStake from ${minStake} SOL to ${minStakeLamports} lamports`
-        );
+        query.stakeAmount.$gte = Number(minStake) * LAMPORTS_PER_SOL;
       }
       if (maxStake) {
-        // Convert from SOL to lamports (1 SOL = 1,000,000,000 lamports)
-        const maxStakeLamports = Number(maxStake) * LAMPORTS_PER_SOL;
-        query.stakeAmount.$lte = maxStakeLamports;
-        console.log(
-          `Converting maxStake from ${maxStake} SOL to ${maxStakeLamports} lamports`
-        );
+        query.stakeAmount.$lte = Number(maxStake) * LAMPORTS_PER_SOL;
       }
     }
 
     // Goal range filter
     if (minGoal || maxGoal) {
       query["goal.value"] = {};
-      if (minGoal) {
-        query["goal.value"].$gte = Number(minGoal);
-      }
-      if (maxGoal) {
-        query["goal.value"].$lte = Number(maxGoal);
-      }
+      if (minGoal) query["goal.value"].$gte = Number(minGoal);
+      if (maxGoal) query["goal.value"].$lte = Number(maxGoal);
     }
 
     // Participant count filter
     if (minParticipants || maxParticipants) {
       query.participantCount = {};
-      if (minParticipants) {
+      if (minParticipants)
         query.participantCount.$gte = Number(minParticipants);
-      }
-      if (maxParticipants) {
+      if (maxParticipants)
         query.participantCount.$lte = Number(maxParticipants);
-      }
     }
 
-    // Fetch challenges
+    // Execute query
     const challenges = await Challenge.find(query)
       .sort(sortOptions)
       .skip(skip)
       .limit(Number(limit));
 
-    // Get total count for pagination
     const total = await Challenge.countDocuments(query);
-
-    console.log(
-      `Query returned ${challenges.length} results out of ${total} total matches`
-    );
 
     return res.status(200).json(
       new ApiResponse(
@@ -212,12 +152,9 @@ export const getChallengeById = async (
 ) => {
   try {
     const { id } = req.params;
-
     const challenge = await Challenge.findById(id);
 
-    if (!challenge) {
-      return next(new ApiError(404, "Challenge not found"));
-    }
+    if (!challenge) return next(new ApiError(404, "Challenge not found"));
 
     return res
       .status(200)
@@ -449,19 +386,6 @@ export const createChallenge = async (
       const newBadges = await badgeService.checkAndAwardBadges(
         user._id.toString()
       );
-
-      if (newBadges.length > 0) {
-        console.log(
-          `User ${user.username} awarded ${
-            newBadges.length
-          } new badges for creating challenge: ${newBadges.join(", ")}`
-        );
-        console.log(
-          `Badge count: before=${badgeCountBefore}, after=${
-            user.badges?.length || 0
-          }`
-        );
-      }
     }
 
     return res
@@ -568,27 +492,6 @@ export const joinChallenge = async (
       user.stats.lastUpdated = new Date();
 
       await user.save();
-
-      // Check badge count before
-      const badgeCountBefore = user.badges?.length || 0;
-
-      // Check for new badges
-      const newBadges = await badgeService.checkAndAwardBadges(
-        user._id.toString()
-      );
-
-      if (newBadges.length > 0) {
-        console.log(
-          `User ${user.username} awarded ${
-            newBadges.length
-          } new badges for joining challenge: ${newBadges.join(", ")}`
-        );
-        console.log(
-          `Badge count: before=${badgeCountBefore}, after=${
-            user.badges?.length || 0
-          }`
-        );
-      }
     }
 
     return res

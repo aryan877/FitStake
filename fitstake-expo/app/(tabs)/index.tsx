@@ -38,7 +38,6 @@ export default function ChallengesScreen() {
   const { address: walletAddress, balance } = useSolanaWallet();
   const {
     challenges,
-    loading,
     error,
     fetchChallenges,
     joinChallenge,
