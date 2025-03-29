@@ -30,8 +30,7 @@ The project consists of three main parts:
 1. **Clone the repository**
 
 ```bash
-git clone https://github.com/yourusername/100xdevs-fitsake.git
-cd 100xdevs-fitsake
+git clone https://github.com/aryan877/FitStake
 ```
 
 2. **Set up environment variables**
