@@ -115,7 +115,7 @@ export const useAppleHealth = () => {
           const options = {
             startDate: startDate.toISOString(),
             endDate: endDate.toISOString(),
-            includeManuallyAdded: true,
+            includeManuallyAdded: false,
           };
 
           // Get detailed step samples for the time range
@@ -129,69 +129,77 @@ export const useAppleHealth = () => {
               return;
             }
 
-            // Get the total steps for this period
-            AppleHealthKit.getStepCount(options, (stepErr, stepResults) => {
-              if (stepErr) {
-                console.error('Error getting step count:', stepErr);
-                setLoading(false);
-                activeFetch.current = false;
-                resolve([]);
-                return;
-              }
+            // Extract sources from the samples
+            const dataSources = new Set<string>();
+            const individualRecords: StepRecord[] = [];
+            const timestamps: number[] = [];
 
-              // Extract sources from the samples
-              const dataSources = new Set<string>();
-              const individualRecords: StepRecord[] = [];
-              const timestamps: number[] = [];
+            // Calculate total steps manually from the samples
+            let totalSteps = 0;
 
-              console.log(results, 'results');
+            if (results && Array.isArray(results)) {
+              results.forEach((sample) => {
+                // Add to total steps
+                totalSteps += sample.value || 0;
 
-              if (results && Array.isArray(results)) {
-                results.forEach((sample) => {
-                  if (sample.metadata && Array.isArray(sample.metadata)) {
-                    sample.metadata.forEach((meta: any) => {
-                      if (meta.sourceName) {
-                        dataSources.add(meta.sourceName);
-                      }
-                    });
-                  }
-
-                  // Create a record for each sample
-                  individualRecords.push({
-                    count: sample.value || 0,
-                    startTime: sample.startDate,
-                    endTime: sample.endDate,
-                    id: `${sample.startDate}-${sample.endDate}`,
+                if (sample.metadata && Array.isArray(sample.metadata)) {
+                  sample.metadata.forEach((meta: any) => {
+                    if (meta.sourceName) {
+                      dataSources.add(meta.sourceName);
+                    }
                   });
+                }
 
-                  if (sample.startDate) {
-                    timestamps.push(new Date(sample.startDate).getTime());
-                  }
+                // Create a record for each sample
+                individualRecords.push({
+                  count: sample.value || 0,
+                  startTime: sample.startDate,
+                  endTime: sample.endDate,
+                  id: `${sample.startDate}-${sample.endDate}`,
                 });
-              }
 
-              // Get the date for ISO format
-              const dateForIso = new Date(startDate);
-              dateForIso.setHours(0, 0, 0, 0);
-              const dateIso = dateForIso.toISOString().split('T')[0]; // YYYY-MM-DD
+                if (sample.startDate) {
+                  timestamps.push(new Date(sample.startDate).getTime());
+                }
+              });
+            }
 
-              // Create standardized format matching Health Connect
-              const formattedResult: StepsData = {
-                date: startDate.toLocaleDateString('en-US'),
-                dateISO: dateIso,
-                count: stepResults.value || 0,
-                startTime: startDate.toISOString(),
-                endTime: endDate.toISOString(),
-                sources: Array.from(dataSources),
-                recordCount: individualRecords.length,
-                timestamps: timestamps.slice(0, 10),
-                records: individualRecords,
-              };
+            // Create a display date format that shows the time range
+            const formatDateTime = (date: Date) => {
+              return `${date.toLocaleDateString()} ${date.toLocaleTimeString(
+                [],
+                {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                }
+              )}`;
+            };
 
-              setLoading(false);
-              activeFetch.current = false;
-              resolve([formattedResult]);
-            });
+            const displayDate = `${formatDateTime(
+              startDate
+            )} - ${formatDateTime(endDate)}`;
+
+            // Get the date for ISO format
+            const dateForIso = new Date(startDate);
+            dateForIso.setHours(0, 0, 0, 0);
+            const dateIso = dateForIso.toISOString().split('T')[0]; // YYYY-MM-DD
+
+            // Create standardized format matching Health Connect
+            const formattedResult: StepsData = {
+              date: displayDate,
+              dateISO: dateIso,
+              count: totalSteps,
+              startTime: startDate.toISOString(),
+              endTime: endDate.toISOString(),
+              sources: Array.from(dataSources),
+              recordCount: individualRecords.length,
+              timestamps: timestamps.slice(0, 10),
+              records: individualRecords,
+            };
+
+            setLoading(false);
+            activeFetch.current = false;
+            resolve([formattedResult]);
           });
         });
       } catch (err) {
@@ -302,6 +310,7 @@ export const useAppleHealth = () => {
               dataOrigin:
                 sample.metadata?.[0] &&
                 typeof sample.metadata[0] === 'object' &&
+                sample.metadata[0] !== null &&
                 'sourceName' in sample.metadata[0]
                   ? (sample.metadata[0].sourceName as string)
                   : 'Apple Health',
