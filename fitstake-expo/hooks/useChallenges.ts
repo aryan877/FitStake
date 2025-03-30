@@ -261,6 +261,7 @@ export const useChallenges = () => {
           token: 'SOL',
           solanaTxId: result.signature,
           isPublic: params.isPublic || false,
+          admin: program.programId.toString(),
         };
 
         const response = await challengeApi.createChallenge(backendData);

@@ -41,8 +41,9 @@ pub mod accountability {
         challenge.is_active = false;                         // Challenge becomes active when min participants join
         challenge.is_completed = false;                      // Challenge is completed after end_time
         
-        // Mark the program signer as the admin for all challenges
-        challenge.admin = ctx.accounts.program_admin.key();
+        // Set the contract deployer (program ID) as the admin for all challenges
+        // This ensures only the program owner can mark challenges as completed
+        challenge.admin = *ctx.program_id;
         
         Ok(())
     }
@@ -108,7 +109,7 @@ pub mod accountability {
     ) -> Result<()> {
         let challenge = &ctx.accounts.challenge;
         
-        // Verify the caller is the admin of this challenge
+        // Verify the caller is the program admin (contract deployer) set during challenge creation
         require!(
             ctx.accounts.admin.key() == challenge.admin,
             AccountingError::UnauthorizedAdmin
@@ -207,10 +208,6 @@ pub struct CreateChallenge<'info> {
     // Authority is the creator of the challenge who pays for account creation
     #[account(mut)]
     pub authority: Signer<'info>,
-    
-    // Program admin - the contract deployer's address that will be the admin for all challenges
-    /// CHECK: This account is only used as a data reference and not written to
-    pub program_admin: UncheckedAccount<'info>,
     
     // Required for creating new accounts on Solana
     pub system_program: Program<'info, System>,
@@ -318,7 +315,7 @@ pub struct ClaimReward<'info> {
 #[account]
 pub struct Challenge {
     pub authority: Pubkey,          // Creator of the challenge
-    pub admin: Pubkey,              // Admin with special privileges for this challenge
+    pub admin: Pubkey,              // Program admin (contract deployer) with privileges to mark completions
     pub challenge_id: String,       // Unique identifier
     pub stake_amount: u64,          // Amount each participant must stake (in lamports)
     pub start_time: i64,            // Challenge start timestamp
