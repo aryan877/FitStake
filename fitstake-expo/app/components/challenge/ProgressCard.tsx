@@ -89,9 +89,7 @@ export const ProgressCard = ({
       <View style={styles.progressStats}>
         <View style={styles.progressStat}>
           <View style={styles.statWithRefresh}>
-            <Text style={styles.progressStatValue}>
-              {totalSteps.toLocaleString()}
-            </Text>
+            <Text style={styles.progressStatValue}>{totalSteps}</Text>
             <Pressable
               style={[
                 styles.refreshButton,

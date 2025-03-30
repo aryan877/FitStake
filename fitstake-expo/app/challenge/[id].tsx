@@ -139,6 +139,15 @@ export default function ChallengeDetailsScreen() {
             setUserParticipant(participant || null);
             if (participant) {
               setPersonalProgress(participant.progress || 0);
+
+              // If user is a participant and there's progress but no health data
+              // make sure to fetch the latest health data to sync with progress
+              if (
+                participant.progress > 0 &&
+                (!healthData || healthData.length === 0)
+              ) {
+                initialDataFetchCompleted.current = false; // Reset to trigger health data fetch
+              }
             }
           }
         }
@@ -252,6 +261,9 @@ export default function ChallengeDetailsScreen() {
         showErrorToast(null, 'No step data available to submit');
         return;
       }
+
+      // Save the fetched health data so UI can be updated
+      setHealthData(latestHealthData);
 
       const totalSteps = latestHealthData.reduce(
         (sum, day) => sum + day.count,
@@ -375,7 +387,13 @@ export default function ChallengeDetailsScreen() {
           setSortedParticipants(sorted);
         }
 
-        fetchHealthData();
+        // Reset the initialization flag to make sure health data is fetched
+        initialDataFetchCompleted.current = false;
+        // Trigger health data fetch
+        const data = await fetchHealthData();
+        if (data && data.length > 0) {
+          setHealthData(data);
+        }
       } else {
         throw new Error('Failed to join challenge');
       }
@@ -442,7 +460,12 @@ export default function ChallengeDetailsScreen() {
     await fetchChallengeDetails();
 
     if (isParticipant) {
-      await fetchHealthData();
+      // Force a fresh health data fetch regardless of initialDataFetchCompleted flag
+      isFetchingHealthData.current = false;
+      const freshData = await fetchHealthData();
+      if (freshData && freshData.length > 0) {
+        setHealthData(freshData);
+      }
     }
 
     setRefreshing(false);
@@ -488,8 +511,22 @@ export default function ChallengeDetailsScreen() {
     );
   }
 
-  const progressPercentage = Math.floor(personalProgress * 100);
-  const isEnded = new Date() > new Date(challenge.endTime * 1000);
+  // Calculate total steps from health data
+  const totalSteps = healthData.reduce((sum, day) => sum + day.count, 0);
+
+  // Calculate progress percentage from participant data or fallback to calculation from health data
+  const progressPercentage =
+    userParticipant && userParticipant.progress
+      ? Math.floor(userParticipant.progress * 100)
+      : Math.floor(personalProgress * 100);
+
+  // If we have a progress percentage but no health data, calculate steps from progress
+  const displaySteps =
+    totalSteps > 0
+      ? totalSteps
+      : progressPercentage > 0 && challenge?.goal?.value
+      ? Math.floor((progressPercentage / 100) * challenge.goal.value)
+      : 0;
 
   // Check if user is eligible for reward
   const isEligibleForReward =
@@ -501,8 +538,7 @@ export default function ChallengeDetailsScreen() {
   const userFailedChallenge =
     challenge?.isCompleted && userParticipant && !userParticipant.completed;
 
-  // Calculate total steps from health data
-  const totalSteps = healthData.reduce((sum, day) => sum + day.count, 0);
+  const isEnded = new Date() > new Date(challenge.endTime * 1000);
 
   return (
     <View style={styles.container}>
@@ -549,7 +585,7 @@ export default function ChallengeDetailsScreen() {
           {isParticipant && (
             <ProgressCard
               progressPercentage={progressPercentage}
-              totalSteps={totalSteps}
+              totalSteps={displaySteps}
               goalSteps={challenge.goal.value}
               isCompleted={challenge.isCompleted}
               isEligibleForReward={!!isEligibleForReward}
@@ -589,7 +625,7 @@ export default function ChallengeDetailsScreen() {
             initiallyExpanded={false}
           />
 
-          {/* Step History Card - Show only if user is a participant */}
+          {/* Step History Card - Always show for participants, regardless of completion status */}
           {isParticipant && (
             <StepHistoryCard
               stepsData={healthData}
