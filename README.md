@@ -10,6 +10,8 @@
 
 FitStake revolutionizes fitness motivation by combining exercise with cryptocurrency rewards. Stake SOL tokens on fitness challenges, complete your goals, and earn rewards - all secured by blockchain technology!
 
+> **Note:** FitStake is currently optimized for iOS devices as primary testing was conducted on iPhone. Android compatibility may vary.
+
 ## 📱 Project Structure
 
 The project consists of three main parts:
