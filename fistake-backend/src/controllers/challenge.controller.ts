@@ -218,15 +218,23 @@ export const getUserChallenges = async (
       "participants.walletAddress": user.walletAddress,
     };
 
+    // Current time in seconds
+    const currentTime = Math.floor(Date.now() / 1000);
+
     // If status is specified, filter by status
     if (status === "COMPLETED") {
       query["participants.completed"] = true;
     } else if (status === "ACTIVE") {
       query["participants.completed"] = false;
       query.isCompleted = false;
+      // Exclude upcoming challenges from active
+      query.startTime = { $lte: currentTime };
     } else if (status === "FAILED") {
       query.isCompleted = true;
       query["participants.completed"] = false;
+    } else if (status === "UPCOMING") {
+      // For upcoming challenges, startTime must be in the future
+      query.startTime = { $gt: currentTime };
     }
 
     const challenges = await Challenge.find(query)
