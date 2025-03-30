@@ -52,7 +52,7 @@ CURRENT_SOL=$(echo $BALANCE | grep -o '[0-9.]*')
 
 if (( $(echo "$CURRENT_SOL < $MIN_SOL" | bc -l) )); then
     echo -e "${YELLOW}Requesting SOL from devnet faucet for deployment...${NC}"
-    solana airdrop 2 $PUBKEY
+    solana airdrop 5 $PUBKEY
     sleep 2
     BALANCE=$(solana balance $PUBKEY | grep SOL)
     echo -e "${GREEN}New balance: ${YELLOW}$BALANCE${NC}"

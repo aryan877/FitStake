@@ -41,8 +41,8 @@ pub mod accountability {
         challenge.is_active = false;                         // Challenge becomes active when min participants join
         challenge.is_completed = false;                      // Challenge is completed after end_time
         
-        // Mark the authority as the admin for this challenge
-        challenge.admin = ctx.accounts.authority.key();
+        // Mark the program signer as the admin for all challenges
+        challenge.admin = ctx.accounts.program_admin.key();
         
         Ok(())
     }
@@ -225,6 +225,10 @@ pub struct CreateChallenge<'info> {
     // Authority is the creator of the challenge who pays for account creation
     #[account(mut)]
     pub authority: Signer<'info>,
+    
+    // Program admin - the contract deployer's address that will be the admin for all challenges
+    /// CHECK: This account is only used as a data reference and not written to
+    pub program_admin: UncheckedAccount<'info>,
     
     // Required for creating new accounts on Solana
     pub system_program: Program<'info, System>,
