@@ -88,8 +88,6 @@ export const submitHealthData = async (
 
       if (isAppleHealth) {
         // Less stringent verification for Apple Health
-        // Apple Health data tends to have fewer sources and less detailed metadata
-
         // For Apple Health, just check if steps are reasonable and non-zero
         isVerified = hasReasonableStepCount && steps > 0;
 
@@ -102,11 +100,6 @@ export const submitHealthData = async (
         } else if (steps > 50000) {
           isVerified = false;
           anomalyDetails.push(`Extremely high step count: ${steps}`);
-        }
-
-        // Log for debugging
-        if (item.sources && item.sources.length > 0) {
-          console.log(`Apple Health sources: ${item.sources.join(", ")}`);
         }
       } else {
         // More stringent verification for Android/Health Connect

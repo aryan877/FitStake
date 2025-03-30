@@ -12,6 +12,7 @@ export const useHealthConnect = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const setupCompleted = useRef(false);
+  const activeFetch = useRef(false);
 
   const initialize = useCallback(async () => {
     if (!isAndroid) return false;
@@ -35,16 +36,25 @@ export const useHealthConnect = () => {
         'react-native-health-connect'
       );
       const permissions = await getGrantedPermissions();
+
+      // Check if we have Steps permission
       const hasStepsPermission = permissions.some(
         (permission) =>
-          permission.recordType === 'Steps' && permission.accessType === 'read'
+          (permission.recordType === 'Steps' ||
+            permission.recordType === 'StepsCadence') &&
+          permission.accessType === 'read'
       );
-      setHasPermissions(hasStepsPermission);
+
+      // Only update state if the value is changing
+      if (hasStepsPermission !== hasPermissions) {
+        setHasPermissions(hasStepsPermission);
+      }
+
       return hasStepsPermission;
     } catch (err) {
       return false;
     }
-  }, [isInitialized]);
+  }, [isInitialized, hasPermissions]);
 
   const requestPermissions = useCallback(async () => {
     if (!isAndroid || !isInitialized) return false;
@@ -54,13 +64,17 @@ export const useHealthConnect = () => {
         { accessType: 'read', recordType: 'Steps' },
       ]);
       const granted = permissions.length > 0;
-      setHasPermissions(granted);
+
+      // Only update state if permissions changed
+      if (granted !== hasPermissions) {
+        setHasPermissions(granted);
+      }
       return granted;
     } catch (err) {
       setError('Failed to request permissions');
       return false;
     }
-  }, [isInitialized]);
+  }, [isInitialized, hasPermissions]);
 
   // Fetch steps data for a specific date-time range
   const fetchStepsForDateRange = useCallback(
@@ -69,17 +83,30 @@ export const useHealthConnect = () => {
         return [];
       }
 
+      // Prevent concurrent fetches
+      if (activeFetch.current) {
+        return [];
+      }
+
+      activeFetch.current = true;
+
+      // Attempt initialization and permissions only if needed
       if (!isInitialized || !hasPermissions) {
         try {
           const initialized = await initialize();
           if (initialized) {
             const granted = await requestPermissions();
-            if (!granted) return [];
+            if (!granted) {
+              activeFetch.current = false;
+              return [];
+            }
           } else {
+            activeFetch.current = false;
             return [];
           }
         } catch (err) {
           console.error('Failed to initialize Health Connect:', err);
+          activeFetch.current = false;
           return [];
         }
       }
@@ -96,7 +123,7 @@ export const useHealthConnect = () => {
         const start = new Date(startDate);
         const end = new Date(endDate);
 
-        // Get steps for the exact time range specified
+        // Get steps for the exact time range specified without breaking it into days
         const [aggregatedSteps, stepsResponse] = await Promise.all([
           aggregateRecord({
             recordType: 'Steps',
@@ -158,7 +185,7 @@ export const useHealthConnect = () => {
         dateForIso.setHours(0, 0, 0, 0);
         const dateIso = dateForIso.toISOString().split('T')[0]; // YYYY-MM-DD
 
-        // Create the result object
+        // Create the result object that represents the entire time range as a single object
         const result: StepsData = {
           date: displayDate,
           dateISO: dateIso,
@@ -180,6 +207,7 @@ export const useHealthConnect = () => {
         return [];
       } finally {
         setLoading(false);
+        activeFetch.current = false;
       }
     },
     [isInitialized, hasPermissions, initialize, requestPermissions]
@@ -189,6 +217,12 @@ export const useHealthConnect = () => {
   const getStepsForLastWeek = useCallback(async () => {
     if (!isAndroid) return [];
 
+    if (activeFetch.current) {
+      return [];
+    }
+
+    activeFetch.current = true;
+
     if (!isInitialized || !hasPermissions) {
       const initialized = await initialize();
       if (initialized) {
@@ -196,14 +230,22 @@ export const useHealthConnect = () => {
         if (!hasPerms) {
           hasPerms = await requestPermissions();
         }
-        if (!hasPerms) return [];
+        if (!hasPerms) {
+          activeFetch.current = false;
+          return [];
+        }
       } else {
+        activeFetch.current = false;
         return [];
       }
     }
 
     try {
       setLoading(true);
+
+      const { aggregateRecord, readRecords } = await import(
+        'react-native-health-connect'
+      );
 
       // Get steps for each day in the last week individually
       const now = new Date();
@@ -218,31 +260,65 @@ export const useHealthConnect = () => {
         const startDate = new Date(endDate);
         startDate.setHours(0, 0, 0, 0); // Start of day
 
-        // Get steps for this specific day
-        const dayData = await fetchStepsForDateRange(startDate, endDate);
-
-        if (dayData && dayData.length > 0) {
-          // Update the date ISO to just the date part for easier matching
-          const dayRecord = {
-            ...dayData[0],
-            dateISO: startDate.toISOString().split('T')[0], // YYYY-MM-DD format
-            date: startDate.toLocaleDateString('en-US'), // MM/DD/YYYY format
-          };
-          results.push(dayRecord);
-        } else {
-          // Add empty record for this day
-          results.push({
-            date: startDate.toLocaleDateString('en-US'),
-            dateISO: startDate.toISOString().split('T')[0],
-            count: 0,
+        // Get aggregated steps for this specific day
+        const aggregatedSteps = await aggregateRecord({
+          recordType: 'Steps',
+          timeRangeFilter: {
+            operator: 'between',
             startTime: startDate.toISOString(),
             endTime: endDate.toISOString(),
-            sources: [],
-            recordCount: 0,
-            timestamps: [],
-            records: [],
+          },
+        });
+
+        // Get detailed records for verification and metadata
+        const stepsResponse = await readRecords('Steps', {
+          timeRangeFilter: {
+            operator: 'between',
+            startTime: startDate.toISOString(),
+            endTime: endDate.toISOString(),
+          },
+        });
+
+        const totalSteps = aggregatedSteps.COUNT_TOTAL || 0;
+        const dataSources = new Set<string>();
+        const recordCount = stepsResponse?.records?.length || 0;
+        const timestamps: number[] = [];
+        const individualRecords: StepRecord[] = [];
+
+        if (recordCount > 0) {
+          stepsResponse.records.forEach((record) => {
+            if (record.metadata?.dataOrigin) {
+              dataSources.add(record.metadata.dataOrigin);
+            }
+
+            if (record.startTime) {
+              timestamps.push(new Date(record.startTime).getTime());
+            }
+
+            individualRecords.push({
+              count: record.count,
+              startTime: record.startTime,
+              endTime: record.endTime,
+              recordingMethod: record.metadata?.recordingMethod,
+              dataOrigin: record.metadata?.dataOrigin,
+              id: record.metadata?.id,
+              lastModifiedTime: record.metadata?.lastModifiedTime,
+            });
           });
         }
+
+        // Add data for this day to results
+        results.push({
+          date: startDate.toLocaleDateString('en-US'),
+          dateISO: startDate.toISOString().split('T')[0],
+          count: totalSteps,
+          startTime: startDate.toISOString(),
+          endTime: endDate.toISOString(),
+          sources: Array.from(dataSources),
+          recordCount,
+          timestamps: timestamps.slice(0, 10),
+          records: individualRecords,
+        });
       }
 
       setStepsData(results);
@@ -252,6 +328,7 @@ export const useHealthConnect = () => {
       return [];
     } finally {
       setLoading(false);
+      activeFetch.current = false;
     }
   }, [
     isInitialized,
@@ -259,7 +336,6 @@ export const useHealthConnect = () => {
     initialize,
     checkPermissions,
     requestPermissions,
-    fetchStepsForDateRange,
   ]);
 
   const setupHealthConnect = useCallback(async () => {
@@ -278,6 +354,7 @@ export const useHealthConnect = () => {
     }
   }, [initialize, checkPermissions, requestPermissions, getStepsForLastWeek]);
 
+  // Run setup once on initialization
   useEffect(() => {
     if (isAndroid && !setupCompleted.current) {
       setupHealthConnect();

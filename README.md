@@ -10,8 +10,6 @@
 
 FitStake revolutionizes fitness motivation by combining exercise with cryptocurrency rewards. Stake SOL tokens on fitness challenges, complete your goals, and earn rewards - all secured by blockchain technology!
 
-> **Note:** FitStake is currently optimized for iOS devices as primary testing was conducted on iPhone. Android compatibility may vary.
-
 ## 📱 Project Structure
 
 The project consists of three main parts:
@@ -139,6 +137,17 @@ The backend handles:
 cd fistake-backend
 npm run dev
 ```
+
+### Automated Tasks with Cron Service
+
+The backend includes a cron service that handles various automated tasks:
+
+- **Challenge Verification**: Checks for ended challenges every 30 seconds
+- **Reward Processing**: Verifies participant completion and submits results to the blockchain
+- **Refund Management**: Automatically refunds stakes for challenges that didn't meet minimum participant thresholds
+- **Badge Awarding**: Processes user achievements and awards badges based on completed challenges
+
+The cron service interacts with Solana smart contracts to handle on-chain verification, finalization, and reward distribution in a trustless manner.
 
 ### Admin Management
 

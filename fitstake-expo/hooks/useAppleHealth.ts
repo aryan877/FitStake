@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 import AppleHealthKit, { HealthKitPermissions } from 'react-native-health';
 import { StepRecord, StepsData } from '../types';
 
-// Check if platform is iOS
+// Apple Health is only available on iOS
 const isIOS = Platform.OS === 'ios';
 
 // Define permissions
@@ -21,100 +21,87 @@ export const useAppleHealth = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const setupCompleted = useRef(false);
+  const activeFetch = useRef(false);
 
   // Initialize Apple HealthKit
   const initialize = useCallback(async () => {
     if (!isIOS) return false;
 
-    try {
-      return new Promise<boolean>((resolve) => {
-        AppleHealthKit.initHealthKit(permissions, (err) => {
-          if (err) {
-            console.error('Error initializing Apple HealthKit:', err);
-            setError('Failed to initialize Apple HealthKit');
-            resolve(false);
-            return;
-          }
-
+    return new Promise<boolean>((resolve) => {
+      AppleHealthKit.initHealthKit(permissions, (err) => {
+        if (err) {
+          console.error('Error initializing HealthKit:', err);
+          setError('Failed to initialize Apple Health');
+          resolve(false);
+        } else {
           setIsInitialized(true);
           resolve(true);
-        });
+        }
       });
-    } catch (err) {
-      console.error('Exception initializing Apple HealthKit:', err);
-      setError('Failed to initialize Apple HealthKit');
-      return false;
-    }
+    });
   }, []);
 
-  // Check if we have permissions - improved to check all required permissions
+  // Check if we have permissions
   const checkPermissions = useCallback(async () => {
-    try {
-      return new Promise<boolean>((resolve) => {
-        AppleHealthKit.getAuthStatus(permissions, (err, result) => {
-          if (err) {
-            console.error('Error checking permissions:', err);
-            resolve(false);
-            return;
-          }
+    if (!isIOS || !isInitialized) return false;
 
-          const hasPermissions =
-            !!result?.permissions?.read &&
-            Array.isArray(result.permissions.read);
+    return new Promise<boolean>((resolve) => {
+      // Check if we have step count permissions
+      AppleHealthKit.getAuthStatus(permissions, (err, result) => {
+        if (err) {
+          console.error('Error checking permissions:', err);
+          resolve(false);
+          return;
+        }
 
-          setHasPermissions(hasPermissions);
-          resolve(hasPermissions);
-        });
+        const hasPermissions =
+          !!result?.permissions?.read && Array.isArray(result.permissions.read);
+
+        setHasPermissions(hasPermissions);
+        resolve(hasPermissions);
       });
-    } catch (err) {
-      console.error('Exception checking permissions:', err);
-      return false;
-    }
+    });
   }, [isInitialized]);
 
   // Request permissions
   const requestPermissions = useCallback(async () => {
     if (!isIOS || !isInitialized) return false;
-
-    try {
-      return new Promise<boolean>((resolve) => {
-        AppleHealthKit.initHealthKit(permissions, (err) => {
-          if (err) {
-            console.error('Error requesting permissions:', err);
-            setError('Failed to request permissions');
-            resolve(false);
-            return;
-          }
-
-          // If initialization succeeds, check if we actually got the permissions
-          checkPermissions().then(resolve);
-        });
-      });
-    } catch (err) {
-      console.error('Exception requesting permissions:', err);
-      setError('Failed to request permissions');
-      return false;
-    }
+    // Apple Health doesn't have a separate request permissions method
+    // It's included in the initialization step, so we just check here
+    return await checkPermissions();
   }, [isInitialized, checkPermissions]);
 
-  // Fetch steps data for a specific date-time range
+  // Fetch steps data for a date range
   const fetchStepsForDateRange = useCallback(
     async (startDate: Date, endDate: Date) => {
       if (!isIOS) {
         return [];
       }
 
+      // Prevent concurrent fetches
+      if (activeFetch.current) {
+        return [];
+      }
+
+      activeFetch.current = true;
+
+      // Ensure we're initialized with permissions
       if (!isInitialized || !hasPermissions) {
         try {
           const initialized = await initialize();
           if (initialized) {
             const granted = await requestPermissions();
-            if (!granted) return [];
+            if (!granted) {
+              activeFetch.current = false;
+              return [];
+            }
           } else {
+            activeFetch.current = false;
             return [];
           }
         } catch (err) {
-          console.error('Failed to initialize Apple HealthKit:', err);
+          console.error('Failed to initialize Apple Health:', err);
+          activeFetch.current = false;
           return [];
         }
       }
@@ -123,147 +110,110 @@ export const useAppleHealth = () => {
       setError(null);
 
       try {
-        // Use the exact time boundaries provided
-        const start = new Date(startDate);
-        const end = new Date(endDate);
+        return new Promise<StepsData[]>((resolve) => {
+          // Format dates for Health Kit
+          const options = {
+            startDate: startDate.toISOString(),
+            endDate: endDate.toISOString(),
+            includeManuallyAdded: true,
+          };
 
-        // For daily totals, use the more accurate getStepCount if the range is for a full day
-        const isFullDay =
-          start.getHours() === 0 &&
-          start.getMinutes() === 0 &&
-          start.getSeconds() === 0 &&
-          end.getHours() === 23 &&
-          end.getMinutes() === 59;
+          // Get detailed step samples for the time range
+          AppleHealthKit.getDailyStepCountSamples(options, (err, results) => {
+            if (err) {
+              console.error('Error getting step samples:', err);
+              setError('Failed to fetch step data');
+              setLoading(false);
+              activeFetch.current = false;
+              resolve([]);
+              return;
+            }
 
-        let totalSteps = 0;
-
-        if (isFullDay) {
-          // Use getStepCount for a single day, which is more reliable for daily totals
-          totalSteps = await new Promise<number>((resolve) => {
-            AppleHealthKit.getStepCount(
-              {
-                date: start.toISOString(),
-                includeManuallyAdded: true,
-              },
-              (err, results) => {
-                if (err) {
-                  console.error('Error fetching step count:', err);
-                  resolve(0);
-                  return;
-                }
-                resolve(results?.value || 0);
-              }
-            );
-          });
-        }
-
-        // Get all step samples within the exact time range (for details or non-daily ranges)
-        const detailedSteps = await new Promise<any>((resolve) => {
-          AppleHealthKit.getDailyStepCountSamples(
-            {
-              startDate: start.toISOString(),
-              endDate: end.toISOString(),
-              includeManuallyAdded: true,
-            },
-            (err, results) => {
-              if (err) {
-                console.error(
-                  `Error fetching step samples for time range:`,
-                  err
-                );
+            // Get the total steps for this period
+            AppleHealthKit.getStepCount(options, (stepErr, stepResults) => {
+              if (stepErr) {
+                console.error('Error getting step count:', stepErr);
+                setLoading(false);
+                activeFetch.current = false;
                 resolve([]);
                 return;
               }
-              resolve(results || []);
-            }
-          );
-        });
 
-        // Create a display date format that shows the time range
-        const formatDateTime = (date: Date) => {
-          return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-          })}`;
-        };
+              // Extract sources from the samples
+              const dataSources = new Set<string>();
+              const individualRecords: StepRecord[] = [];
+              const timestamps: number[] = [];
 
-        const displayDate = `${formatDateTime(start)} - ${formatDateTime(end)}`;
+              console.log(results, 'results');
 
-        // Process all records in the time range
-        const dataSources = new Set<string>();
-        const recordCount = detailedSteps.length || 0;
-        const timestamps: number[] = [];
-        const individualRecords: StepRecord[] = [];
+              if (results && Array.isArray(results)) {
+                results.forEach((sample) => {
+                  if (sample.metadata && Array.isArray(sample.metadata)) {
+                    sample.metadata.forEach((meta: any) => {
+                      if (meta.sourceName) {
+                        dataSources.add(meta.sourceName);
+                      }
+                    });
+                  }
 
-        // Process records
-        if (recordCount > 0) {
-          detailedSteps.forEach((record: any) => {
-            if (record.metadata?.[0]?.sourceId) {
-              dataSources.add(record.metadata[0].sourceId);
-            } else if (record.metadata?.[0]?.sourceName) {
-              dataSources.add(record.metadata[0].sourceName);
-            }
+                  // Create a record for each sample
+                  individualRecords.push({
+                    count: sample.value || 0,
+                    startTime: sample.startDate,
+                    endTime: sample.endDate,
+                    id: `${sample.startDate}-${sample.endDate}`,
+                  });
 
-            if (record.startDate) {
-              timestamps.push(new Date(record.startDate).getTime());
-            }
+                  if (sample.startDate) {
+                    timestamps.push(new Date(sample.startDate).getTime());
+                  }
+                });
+              }
 
-            individualRecords.push({
-              count: record.value || 0,
-              startTime: record.startDate || '',
-              endTime: record.endTime || '',
-              dataOrigin: record.metadata?.[0]?.sourceName || '',
-              id:
-                record.startDate && record.endTime
-                  ? `${record.startDate}-${record.endTime}`
-                  : `record-${Date.now()}-${Math.random()}`,
+              // Get the date for ISO format
+              const dateForIso = new Date(startDate);
+              dateForIso.setHours(0, 0, 0, 0);
+              const dateIso = dateForIso.toISOString().split('T')[0]; // YYYY-MM-DD
+
+              // Create standardized format matching Health Connect
+              const formattedResult: StepsData = {
+                date: startDate.toLocaleDateString('en-US'),
+                dateISO: dateIso,
+                count: stepResults.value || 0,
+                startTime: startDate.toISOString(),
+                endTime: endDate.toISOString(),
+                sources: Array.from(dataSources),
+                recordCount: individualRecords.length,
+                timestamps: timestamps.slice(0, 10),
+                records: individualRecords,
+              };
+
+              setLoading(false);
+              activeFetch.current = false;
+              resolve([formattedResult]);
             });
           });
-        }
-
-        // If we didn't get total steps from getStepCount (non-daily range), calculate from samples
-        if (!isFullDay || totalSteps === 0) {
-          totalSteps = individualRecords.reduce(
-            (sum, record) => sum + record.count,
-            0
-          );
-        }
-
-        // Get the date for ISO format - normalize to the start date's calendar day
-        const dateForIso = new Date(start);
-        dateForIso.setHours(0, 0, 0, 0);
-        const dateIso = dateForIso.toISOString().split('T')[0]; // YYYY-MM-DD
-
-        // Create the result object
-        const result: StepsData = {
-          date: displayDate,
-          dateISO: dateIso,
-          count: totalSteps,
-          startTime: start.toISOString(),
-          endTime: end.toISOString(),
-          sources: Array.from(dataSources),
-          recordCount,
-          timestamps: timestamps.slice(0, 10),
-          records: individualRecords,
-        };
-
-        const results = [result];
-        setStepsData(results);
-        return results;
+        });
       } catch (err) {
-        console.error('Failed to fetch steps data for date range:', err);
-        setError('Failed to fetch steps data for date range');
-        return [];
-      } finally {
+        console.error('Failed to fetch steps data:', err);
+        setError('Failed to fetch steps data');
         setLoading(false);
+        activeFetch.current = false;
+        return [];
       }
     },
     [isInitialized, hasPermissions, initialize, requestPermissions]
   );
 
-  // Get steps data for the last week (for challenge progress tracking)
+  // Get steps data for the last week
   const getStepsForLastWeek = useCallback(async () => {
     if (!isIOS) return [];
+
+    if (activeFetch.current) {
+      return [];
+    }
+
+    activeFetch.current = true;
 
     if (!isInitialized || !hasPermissions) {
       const initialized = await initialize();
@@ -272,8 +222,12 @@ export const useAppleHealth = () => {
         if (!hasPerms) {
           hasPerms = await requestPermissions();
         }
-        if (!hasPerms) return [];
+        if (!hasPerms) {
+          activeFetch.current = false;
+          return [];
+        }
       } else {
+        activeFetch.current = false;
         return [];
       }
     }
@@ -281,112 +235,96 @@ export const useAppleHealth = () => {
     try {
       setLoading(true);
 
-      // Get steps for each day in the last week individually
+      // Process the last 7 days (including today)
       const now = new Date();
       const results: StepsData[] = [];
 
-      // Process the last 7 days (including today)
       for (let i = 0; i < 7; i++) {
-        const date = new Date(now);
-        date.setDate(now.getDate() - i);
+        const endDate = new Date(now);
+        endDate.setDate(now.getDate() - i);
+        endDate.setHours(23, 59, 59, 999); // End of day
 
-        // Set to midnight for start and end of day
-        const dayStart = new Date(date);
-        dayStart.setHours(0, 0, 0, 0);
+        const startDate = new Date(endDate);
+        startDate.setHours(0, 0, 0, 0); // Start of day
 
-        const dayEnd = new Date(date);
-        dayEnd.setHours(23, 59, 59, 999);
+        // Format dates for Health Kit
+        const options = {
+          date: startDate.toISOString(), // For single day total
+          startDate: startDate.toISOString(), // For samples
+          endDate: endDate.toISOString(),
+          includeManuallyAdded: true,
+        };
 
-        // Format dates for consistency
-        const dateISO = dayStart.toISOString().split('T')[0]; // YYYY-MM-DD
-        const dateString = dayStart.toLocaleDateString('en-US'); // MM/DD/YYYY
-
-        // Get daily step count using getStepCount
-        const dailySteps = await new Promise<number>((resolve) => {
-          AppleHealthKit.getStepCount(
-            {
-              date: dayStart.toISOString(),
-              includeManuallyAdded: true,
-            },
-            (err, results) => {
-              if (err) {
-                console.error(
-                  `Error fetching step count for day ${dateString}:`,
-                  err
-                );
-                resolve(0);
-                return;
-              }
-              resolve(results?.value || 0);
+        // Get total steps for this specific day
+        const stepCount = await new Promise<number>((resolve) => {
+          AppleHealthKit.getStepCount(options, (err, results) => {
+            if (err) {
+              console.error('Error getting step count:', err);
+              resolve(0);
+              return;
             }
-          );
+            resolve(results.value || 0);
+          });
         });
 
-        // Get detailed samples for the day
-        const detailedSamples = await new Promise<any[]>((resolve) => {
-          AppleHealthKit.getDailyStepCountSamples(
-            {
-              startDate: dayStart.toISOString(),
-              endDate: dayEnd.toISOString(),
-              includeManuallyAdded: true,
-            },
-            (err, results) => {
-              if (err) {
-                console.error(
-                  `Error fetching step samples for day ${dateString}:`,
-                  err
-                );
-                resolve([]);
-                return;
-              }
-              resolve(results || []);
+        // Get step samples for detailed metadata
+        const stepSamples = await new Promise<any[]>((resolve) => {
+          AppleHealthKit.getDailyStepCountSamples(options, (err, results) => {
+            if (err) {
+              console.error('Error getting step samples:', err);
+              resolve([]);
+              return;
             }
-          );
+            resolve(results || []);
+          });
         });
 
-        // Process detailed samples for this day
+        // Extract sources and create records
         const dataSources = new Set<string>();
+        const individualRecords: StepRecord[] = [];
         const timestamps: number[] = [];
-        const records: StepRecord[] = [];
 
-        if (detailedSamples.length > 0) {
-          detailedSamples.forEach((sample) => {
-            // Extract source information
-            if (sample.metadata?.[0]?.sourceId) {
-              dataSources.add(sample.metadata[0].sourceId);
-            } else if (sample.metadata?.[0]?.sourceName) {
-              dataSources.add(sample.metadata[0].sourceName);
+        if (stepSamples && Array.isArray(stepSamples)) {
+          stepSamples.forEach((sample) => {
+            if (sample.metadata && Array.isArray(sample.metadata)) {
+              sample.metadata.forEach((meta: any) => {
+                if (meta.sourceName) {
+                  dataSources.add(meta.sourceName);
+                }
+              });
             }
 
-            // Add timestamp
+            // Create a record for each sample
+            individualRecords.push({
+              count: sample.value || 0,
+              startTime: sample.startDate,
+              endTime: sample.endDate,
+              dataOrigin:
+                sample.metadata?.[0] &&
+                typeof sample.metadata[0] === 'object' &&
+                'sourceName' in sample.metadata[0]
+                  ? (sample.metadata[0].sourceName as string)
+                  : 'Apple Health',
+              id: `${sample.startDate}-${sample.endDate}`,
+            });
+
             if (sample.startDate) {
               timestamps.push(new Date(sample.startDate).getTime());
             }
-
-            // Create record
-            records.push({
-              count: sample.value || 0,
-              startTime: sample.startDate || '',
-              endTime: sample.endDate || '',
-              dataOrigin: sample.metadata?.[0]?.sourceName || '',
-              id:
-                sample.metadata?.[0]?.sourceId ||
-                `record-${Date.now()}-${Math.random()}`,
-            });
           });
         }
 
-        // Create a standardized record for this day
+        // Add formatted data for this day
         results.push({
-          date: dateString,
-          dateISO: dateISO,
-          count: dailySteps,
-          startTime: dayStart.toISOString(),
-          endTime: dayEnd.toISOString(),
+          date: startDate.toLocaleDateString('en-US'),
+          dateISO: startDate.toISOString().split('T')[0],
+          count: stepCount,
+          startTime: startDate.toISOString(),
+          endTime: endDate.toISOString(),
           sources: Array.from(dataSources),
-          recordCount: detailedSamples.length,
+          recordCount: individualRecords.length,
           timestamps: timestamps.slice(0, 10),
-          records: records,
+          records: individualRecords,
         });
       }
 
@@ -397,6 +335,7 @@ export const useAppleHealth = () => {
       return [];
     } finally {
       setLoading(false);
+      activeFetch.current = false;
     }
   }, [
     isInitialized,
@@ -406,25 +345,25 @@ export const useAppleHealth = () => {
     requestPermissions,
   ]);
 
-  // Improved setup function with better error handling
   const setupAppleHealth = useCallback(async () => {
-    if (!isIOS) return false;
+    if (setupCompleted.current) return true;
 
-    try {
-      // Reset setup state for a fresh start
-      setupCompleted.current = false;
-      setError(null);
-
-      await getStepsForLastWeek();
-      setupCompleted.current = true;
-      return true;
-    } catch (error) {
-      console.error('Error during Apple Health setup:', error);
-      setError('Failed to set up Apple Health integration');
-      return false;
+    const initialized = await initialize();
+    if (initialized) {
+      let hasPerms = await checkPermissions();
+      if (!hasPerms) {
+        hasPerms = await requestPermissions();
+      }
+      if (hasPerms) {
+        await getStepsForLastWeek();
+        setupCompleted.current = true;
+        return true;
+      }
     }
-  }, [getStepsForLastWeek]);
+    return false;
+  }, [initialize, checkPermissions, requestPermissions, getStepsForLastWeek]);
 
+  // Run setup once on initialization
   useEffect(() => {
     if (isIOS && !setupCompleted.current) {
       setupAppleHealth();
@@ -432,7 +371,7 @@ export const useAppleHealth = () => {
   }, [setupAppleHealth]);
 
   const refreshStepsData = useCallback(async () => {
-    setupCompleted.current = false;
+    setupCompleted.current = false; // Reset to force refresh
 
     if (isInitialized) {
       let hasPerms = await checkPermissions();
@@ -444,6 +383,7 @@ export const useAppleHealth = () => {
       }
     } else {
       await setupAppleHealth();
+      return getStepsForLastWeek();
     }
     return [];
   }, [

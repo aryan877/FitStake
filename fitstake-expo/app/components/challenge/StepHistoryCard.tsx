@@ -25,10 +25,12 @@ export const StepHistoryCard = ({
       ) : stepsData.length > 0 ? (
         stepsData.map((item) => (
           <View key={item.date} style={styles.historyItem}>
-            <Text style={styles.dateText}>{item.date}</Text>
-            <Text style={styles.stepsText}>
-              {item.count.toLocaleString()} steps
-            </Text>
+            <View style={styles.historyContent}>
+              <Text style={styles.dateText}>{item.date}</Text>
+              <Text style={styles.stepsText}>
+                {item.count.toLocaleString()} steps
+              </Text>
+            </View>
           </View>
         ))
       ) : (
@@ -59,18 +61,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   historyItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     padding: spacing.md,
     backgroundColor: colors.gray[800],
     borderRadius: borderRadius.md,
     marginBottom: spacing.sm,
   },
+  historyContent: {
+    flexDirection: 'column',
+  },
   dateText: {
     fontSize: fontSize.sm,
     color: colors.white,
     fontWeight: fontWeight.medium,
+    marginBottom: spacing.xs,
   },
   stepsText: {
     fontSize: fontSize.sm,

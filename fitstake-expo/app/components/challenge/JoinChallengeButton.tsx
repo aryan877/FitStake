@@ -52,7 +52,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     ...shadows.md,
     marginBottom: spacing.md,
-    marginHorizontal: spacing.md,
   },
   buttonText: {
     color: colors.white,

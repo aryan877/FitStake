@@ -72,13 +72,13 @@ export default function ChallengeDetailsScreen() {
   const [currentTimeRemaining, setCurrentTimeRemaining] = useState<string>('');
   const [challengeHasStarted, setChallengeHasStarted] = useState(false);
 
-  // Timer ref for cleanup
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const {
     fetchStepsForDateRange,
     loading: healthDataLoading,
     getHealthProvider,
+    setupHealth,
   } = useHealth();
 
   // Update time remaining
@@ -95,7 +95,6 @@ export default function ChallengeDetailsScreen() {
 
   // Setup timer for live countdown
   useEffect(() => {
-    console.log('setting up timer');
     // Initial update
     updateTimeRemaining();
 
@@ -159,11 +158,19 @@ export default function ChallengeDetailsScreen() {
     }
   }, [id, user, fetchChallengeById]);
 
-  // Fetch user's health data for this challenge
+  // Add this flag to prevent redundant data fetching
+  const isFetchingHealthData = useRef(false);
+
   const fetchHealthData = useCallback(async () => {
+    if (isFetchingHealthData.current) {
+      return [];
+    }
+
     if (!challenge) return [];
 
     try {
+      isFetchingHealthData.current = true;
+
       const challengeStartTime = new Date(challenge.startTime * 1000);
       const challengeEndTime = new Date(challenge.endTime * 1000);
       const now = new Date();
@@ -171,97 +178,63 @@ export default function ChallengeDetailsScreen() {
       // If challenge hasn't ended yet, use current date as end boundary
       const actualEndDate = now < challengeEndTime ? now : challengeEndTime;
 
-      // Calculate number of days in challenge (up to current date)
-      const startDay = new Date(challengeStartTime);
-      startDay.setHours(0, 0, 0, 0); // Start of the first day
+      // Respect the exact challenge time boundaries, regardless of day boundaries
+      const data = await fetchStepsForDateRange(
+        challengeStartTime,
+        actualEndDate
+      );
 
-      const endDay = new Date(actualEndDate);
-      endDay.setHours(23, 59, 59, 999); // End of the last day
-
-      // Calculate the difference in days between start and end
-      const dayDiff =
-        Math.floor(
-          (endDay.getTime() - startDay.getTime()) / (1000 * 60 * 60 * 24)
-        ) + 1;
-
-      // Fetch data for each day individually
-      const allStepsData: StepsData[] = [];
-
-      for (let i = 0; i < dayDiff; i++) {
-        const currentDate = new Date(startDay);
-        currentDate.setDate(startDay.getDate() + i);
-
-        const dayStart = new Date(currentDate);
-        dayStart.setHours(0, 0, 0, 0);
-
-        const dayEnd = new Date(currentDate);
-        dayEnd.setHours(23, 59, 59, 999);
-
-        // Don't exceed the actual challenge end time or current time
-        const adjustedDayEnd = new Date(
-          Math.min(dayEnd.getTime(), actualEndDate.getTime())
-        );
-
-        // Don't request data before the challenge start time
-        const adjustedDayStart = new Date(
-          Math.max(dayStart.getTime(), challengeStartTime.getTime())
-        );
-
-        // Only fetch if the day start is before the end time
-        if (adjustedDayStart <= adjustedDayEnd) {
-          const dayData = await fetchStepsForDateRange(
-            adjustedDayStart,
-            adjustedDayEnd
-          );
-
-          if (dayData && Array.isArray(dayData) && dayData.length > 0) {
-            // Update with consistent dateISO for easier matching
-            const updatedDayData = {
-              ...dayData[0],
-              dateISO: dayStart.toISOString().split('T')[0],
-              date: dayStart.toLocaleDateString('en-US'),
-            };
-            allStepsData.push(updatedDayData);
-          } else {
-            // Add empty record for days with no data
-            allStepsData.push({
-              date: dayStart.toLocaleDateString('en-US'),
-              dateISO: dayStart.toISOString().split('T')[0],
-              count: 0,
-              startTime: adjustedDayStart.toISOString(),
-              endTime: adjustedDayEnd.toISOString(),
-              sources: [],
-              recordCount: 0,
-              timestamps: [],
-              records: [],
-            });
-          }
-        }
-      }
-
-      // Only set health data if we got valid data back and component is still mounted
-      if (allStepsData.length > 0) {
-        setHealthData(allStepsData);
-
+      if (data && Array.isArray(data) && data.length > 0) {
         // Calculate total steps and progress
-        const totalSteps = allStepsData.reduce(
-          (sum, day) => sum + day.count,
-          0
-        );
+        const totalSteps = data.reduce((sum, day) => sum + day.count, 0);
         const calculatedProgress = Math.min(
           1,
           totalSteps / challenge.goal.value
         );
         setPersonalProgress(calculatedProgress);
+        return data;
       }
 
-      return allStepsData;
+      return [];
     } catch (error) {
       console.error('Error fetching health data:', error);
       showErrorToast(error, 'Failed to fetch health data');
       return [];
+    } finally {
+      isFetchingHealthData.current = false;
     }
   }, [challenge, fetchStepsForDateRange]);
+
+  const initialDataFetchCompleted = useRef(false);
+
+  useEffect(() => {
+    // Only fetch once when challenge and participant status are confirmed
+    if (
+      challenge &&
+      isParticipant &&
+      !initialDataFetchCompleted.current &&
+      !isFetchingHealthData.current
+    ) {
+      initialDataFetchCompleted.current = true;
+
+      // Initialize and request permissions if needed
+      setupHealth?.().then(() => {
+        fetchHealthData().then((data) => {
+          if (data && data.length > 0) {
+            setHealthData(data);
+
+            // Log the data summary
+            const totalSteps = data.reduce((sum, day) => sum + day.count, 0);
+            console.log(
+              `Retrieved ${data.length} health records with ${totalSteps} total steps`
+            );
+          } else {
+            console.log('No health data available for challenge timeframe');
+          }
+        });
+      });
+    }
+  }, [challenge?.id, isParticipant, setupHealth]);
 
   // Sync health data with backend
   const syncHealthData = async () => {
@@ -280,6 +253,12 @@ export default function ChallengeDetailsScreen() {
         return;
       }
 
+      const totalSteps = latestHealthData.reduce(
+        (sum, day) => sum + day.count,
+        0
+      );
+
+      // The single health record will now include the entire time range
       const result = await submitChallengeHealthData(
         challenge.id,
         latestHealthData,
@@ -311,14 +290,10 @@ export default function ChallengeDetailsScreen() {
           }
         }
 
-        // Show a more informative success message
-        const totalSteps = latestHealthData.reduce(
-          (sum, day) => sum + day.count,
-          0
-        );
+        // Show a more informative success message with progress percentage
         showSuccessToast(
           `Data submitted: ${totalSteps.toLocaleString()} steps (${Math.floor(
-            result.progress || 0
+            (totalSteps / challenge.goal.value) * 100
           )}% complete)`
         );
       } else {
@@ -461,23 +436,6 @@ export default function ChallengeDetailsScreen() {
     console.log('fetching challenge details');
     fetchChallengeDetails();
   }, [fetchChallengeDetails]);
-
-  // Load health data when challenge details are loaded
-  useEffect(() => {
-    let mounted = true;
-
-    if (challenge && isParticipant && !loading) {
-      fetchHealthData().then((data) => {
-        if (mounted && data) {
-          setHealthData(data);
-        }
-      });
-    }
-
-    return () => {
-      mounted = false;
-    };
-  }, [challenge?.id, isParticipant, loading]);
 
   const onRefresh = async () => {
     setRefreshing(true);

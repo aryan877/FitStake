@@ -35,7 +35,7 @@ export const useHealth = () => {
     return platform.isIOS ? appleHealth : healthConnect;
   }, [platform.isIOS, appleHealth, healthConnect]);
 
-  // Memoize state values from implementation to prevent unnecessary re-renders
+  // Local loading state
   const [localLoading, setLocalLoading] = useState(false);
 
   // Memoize implementation states to prevent re-renders
@@ -84,10 +84,19 @@ export const useHealth = () => {
     async (startDate: Date, endDate: Date) => {
       try {
         setLocalLoading(true);
+
         if (platform.isIOS) {
-          return await appleHealth.fetchStepsForDateRange(startDate, endDate);
+          const result = await appleHealth.fetchStepsForDateRange(
+            startDate,
+            endDate
+          );
+          return result;
         } else if (platform.isAndroid) {
-          return await healthConnect.fetchStepsForDateRange(startDate, endDate);
+          const result = await healthConnect.fetchStepsForDateRange(
+            startDate,
+            endDate
+          );
+          return result;
         }
         return [];
       } catch (error) {

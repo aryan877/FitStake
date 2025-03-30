@@ -1,13 +1,7 @@
 import theme from '@/app/theme';
 import { useHealth } from '@/hooks/useHealth';
 import { Footprints, RefreshCw } from 'lucide-react-native';
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -21,25 +15,25 @@ import {
 
 const { colors, spacing, borderRadius, fontSize, fontWeight, shadows } = theme;
 
-// Helper function for date formatting - moved outside component
+// Helper function for date formatting
 const formatDateString = (dateString: string) => {
   if (!dateString) return 'Unknown date';
 
   try {
-    let date;
+    // Try to parse the date (support both ISO and MM/DD/YYYY format)
+    let date: Date;
 
-    // Try to parse the date in a consistent way
     if (dateString.includes('-') && dateString.length === 10) {
-      // YYYY-MM-DD format (from ISO string)
-      const [year, month, day] = dateString.split('-').map(Number);
-      date = new Date(year, month - 1, day);
+      // YYYY-MM-DD format (from dateISO)
+      date = new Date(dateString);
     } else if (dateString.includes('/')) {
       // MM/DD/YYYY format
       const parts = dateString.split('/');
-      const month = parseInt(parts[0], 10) - 1; // Months are 0-indexed in JS Date
-      const day = parseInt(parts[1], 10);
-      const year = parseInt(parts[2], 10);
-      date = new Date(year, month, day);
+      date = new Date(
+        parseInt(parts[2], 10),
+        parseInt(parts[0], 10) - 1,
+        parseInt(parts[1], 10)
+      );
     } else {
       // Any other format
       date = new Date(dateString);
@@ -47,7 +41,6 @@ const formatDateString = (dateString: string) => {
 
     // Check if the date is valid
     if (isNaN(date.getTime())) {
-      console.error('Invalid date format:', dateString);
       return 'Unknown';
     }
 
@@ -141,23 +134,26 @@ const ErrorComponent = ({ errorMessage }: { errorMessage: string | null }) => (
 
 // Steps Data Component - Main component to show steps data
 const StepsDataContent = ({
-  processedStepsData,
+  stepsData,
   formattedSyncTime,
   handleRefresh,
   isRefreshing,
   spin,
 }: {
-  processedStepsData: any[];
+  stepsData: any[];
   formattedSyncTime: string;
   handleRefresh: () => Promise<void>;
   isRefreshing: boolean;
   spin: any;
 }) => {
-  // Get today's data (first item in processed data)
-  const todayData = processedStepsData[0];
+  // Get today's data (first item in stepsData)
+  const todayData = stepsData.length > 0 ? stepsData[0] : { count: 0 };
 
   // Get recent history (up to 5 days)
-  const recentHistory = processedStepsData.slice(0, 5);
+  const recentHistory = stepsData.slice(0, 5).map((item) => ({
+    ...item,
+    displayDate: formatDateString(item.dateISO || item.date),
+  }));
 
   return (
     <View style={styles.stepsCardContainer}>
@@ -232,7 +228,6 @@ const StepsDataContent = ({
 
 const StepsDataCard = () => {
   const {
-    isAndroid,
     isIOS,
     stepsData,
     loading,
@@ -245,11 +240,9 @@ const StepsDataCard = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const spinValue = useRef(new Animated.Value(0)).current;
-
-  // Add this ref to prevent multiple initialization attempts
   const initAttempted = useRef(false);
 
-  // Modify the startSpinAnimation function to track the animation reference
+  // Animation for refresh icon
   const startSpinAnimation = useCallback(() => {
     spinValue.setValue(0);
     const animation = Animated.loop(
@@ -264,16 +257,16 @@ const StepsDataCard = () => {
     return animation;
   }, [spinValue]);
 
-  // Handle refreshing steps data - with improved animation handling
+  // Handle refreshing steps data
   const handleRefresh = useCallback(async () => {
     if (isRefreshing) return; // Prevent multiple refreshes
 
     try {
       setIsRefreshing(true);
-      const animation = startSpinAnimation(); // Start and track the animation
+      const animation = startSpinAnimation();
 
       await refreshStepsData();
-      setLastSyncTime(new Date()); // Update last sync time
+      setLastSyncTime(new Date());
 
       // Stop animation after data is loaded
       animation.stop();
@@ -281,18 +274,14 @@ const StepsDataCard = () => {
       console.error('Error refreshing steps data:', error);
     } finally {
       setIsRefreshing(false);
-      // Make sure animation stops even if there's an error
       spinValue.stopAnimation();
     }
   }, [isRefreshing, refreshStepsData, startSpinAnimation]);
 
-  // Initialize health service - add cleanup and prevent multiple calls
+  // Initialize health service
   useEffect(() => {
     let isMounted = true;
-    // Track the animation reference properly
-    let animationRef: Animated.CompositeAnimation | null = null;
 
-    // Only attempt initialization once
     if (!initAttempted.current) {
       initAttempted.current = true;
 
@@ -300,7 +289,7 @@ const StepsDataCard = () => {
         try {
           await setupHealth();
           if (isMounted) {
-            setLastSyncTime(new Date()); // Set initial sync time
+            setLastSyncTime(new Date());
           }
         } catch (error) {
           console.error('Failed to initialize health service:', error);
@@ -312,90 +301,17 @@ const StepsDataCard = () => {
 
     return () => {
       isMounted = false;
-      // Stop any ongoing animations when component unmounts
       spinValue.stopAnimation();
     };
   }, [setupHealth]);
 
-  // Process and normalize the steps data - called regardless of render path
-  const processedStepsData = useMemo(() => {
-    // If we don't have data yet, return empty array
-    if (!stepsData || stepsData.length === 0) {
-      return Array(7).fill({
-        count: 0,
-        displayDate: '',
-        sources: [],
-        records: [],
-      });
-    }
-
-    // Create an array of the last 7 days
-    const result = [];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Normalize today to start of day
-
-    // Generate dates for the last 7 days
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() - i);
-      date.setHours(0, 0, 0, 0); // Ensure we're looking at start of day
-
-      // Format date consistently for comparison
-      const formattedDate = date.toLocaleDateString('en-US'); // MM/DD/YYYY
-      const isoDate = date.toISOString().split('T')[0]; // YYYY-MM-DD
-
-      // Find matching data for this date - prioritize matching by dateISO
-      const matchingData = stepsData.find((item) => {
-        // First try to match using the ISO date string if available (most reliable)
-        if (item.dateISO && item.dateISO === isoDate) {
-          return true;
-        }
-
-        // If no match by ISO, try to match by date string
-        if (item.date && item.date === formattedDate) {
-          return true;
-        }
-
-        // Last resort: Parse and compare dates
-        try {
-          // Only attempt to parse if we have a date value
-          if (!item.date) return false;
-
-          const itemDate = new Date(item.date);
-          if (isNaN(itemDate.getTime())) return false;
-
-          return (
-            itemDate.getFullYear() === date.getFullYear() &&
-            itemDate.getMonth() === date.getMonth() &&
-            itemDate.getDate() === date.getDate()
-          );
-        } catch (e) {
-          return false;
-        }
-      });
-
-      result.push({
-        date: formattedDate,
-        displayDate: formatDateString(formattedDate),
-        count: matchingData ? matchingData.count : 0,
-        sources: matchingData?.sources || [],
-        recordCount: matchingData?.recordCount || 0,
-        records: matchingData?.records || [],
-      });
-    }
-
-    return result;
-  }, [stepsData]);
-
-  // Format the last sync time - called regardless of render path
-  const formattedSyncTime = useMemo(() => {
-    return lastSyncTime
-      ? lastSyncTime.toLocaleTimeString([], {
-          hour: '2-digit',
-          minute: '2-digit',
-        })
-      : 'Never';
-  }, [lastSyncTime]);
+  // Format the last sync time
+  const formattedSyncTime = lastSyncTime
+    ? lastSyncTime.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : 'Never';
 
   // Show connection component if not connected
   if (!hasPermissions) {
@@ -415,7 +331,7 @@ const StepsDataCard = () => {
   // Connected with data
   return (
     <StepsDataContent
-      processedStepsData={processedStepsData}
+      stepsData={stepsData}
       formattedSyncTime={formattedSyncTime}
       handleRefresh={handleRefresh}
       isRefreshing={isRefreshing}
