@@ -389,6 +389,28 @@ const CreateChallengeModal = ({
               <Text style={styles.datePickerNote}>
                 Tap to select start date/time
               </Text>
+
+              {/* iOS Start DateTime Picker - placed directly below its input */}
+              {Platform.OS === 'ios' && showStartDatePicker && (
+                <View style={styles.dateTimePickerContainer}>
+                  <View style={styles.dateTimePickerHeader}>
+                    <TouchableOpacity onPress={() => handleIOSDateCancel(true)}>
+                      <Text style={styles.dateTimePickerCancel}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={handleIOSStartDateConfirm}>
+                      <Text style={styles.dateTimePickerDone}>Done</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <DateTimePicker
+                    value={tempStartDate || new Date()}
+                    mode="datetime"
+                    display="spinner"
+                    onChange={handleStartDateChange}
+                    minimumDate={new Date()}
+                    style={styles.dateTimePicker}
+                  />
+                </View>
+              )}
             </View>
 
             <View style={styles.inputContainer}>
@@ -418,54 +440,35 @@ const CreateChallengeModal = ({
               <Text style={styles.datePickerNote}>
                 Tap to select end date/time
               </Text>
+
+              {/* iOS End DateTime Picker - placed directly below its input */}
+              {Platform.OS === 'ios' && showEndDatePicker && (
+                <View style={styles.dateTimePickerContainer}>
+                  <View style={styles.dateTimePickerHeader}>
+                    <TouchableOpacity
+                      onPress={() => handleIOSDateCancel(false)}
+                    >
+                      <Text style={styles.dateTimePickerCancel}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={handleIOSEndDateConfirm}>
+                      <Text style={styles.dateTimePickerDone}>Done</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <DateTimePicker
+                    value={tempEndDate || new Date()}
+                    mode="datetime"
+                    display="spinner"
+                    onChange={handleEndDateChange}
+                    minimumDate={
+                      tempStartDate
+                        ? new Date(tempStartDate.getTime() + 60 * 60 * 1000)
+                        : new Date()
+                    } // At least 1 hour after start
+                    style={styles.dateTimePicker}
+                  />
+                </View>
+              )}
             </View>
-
-            {/* Date Time Pickers - iOS only shows the picker in our UI */}
-            {Platform.OS === 'ios' && showStartDatePicker && (
-              <View style={styles.dateTimePickerContainer}>
-                <View style={styles.dateTimePickerHeader}>
-                  <TouchableOpacity onPress={() => handleIOSDateCancel(true)}>
-                    <Text style={styles.dateTimePickerCancel}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={handleIOSStartDateConfirm}>
-                    <Text style={styles.dateTimePickerDone}>Done</Text>
-                  </TouchableOpacity>
-                </View>
-                <DateTimePicker
-                  value={tempStartDate || new Date()}
-                  mode="datetime"
-                  display="spinner"
-                  onChange={handleStartDateChange}
-                  minimumDate={new Date()}
-                  style={styles.dateTimePicker}
-                />
-              </View>
-            )}
-
-            {Platform.OS === 'ios' && showEndDatePicker && (
-              <View style={styles.dateTimePickerContainer}>
-                <View style={styles.dateTimePickerHeader}>
-                  <TouchableOpacity onPress={() => handleIOSDateCancel(false)}>
-                    <Text style={styles.dateTimePickerCancel}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={handleIOSEndDateConfirm}>
-                    <Text style={styles.dateTimePickerDone}>Done</Text>
-                  </TouchableOpacity>
-                </View>
-                <DateTimePicker
-                  value={tempEndDate || new Date()}
-                  mode="datetime"
-                  display="spinner"
-                  onChange={handleEndDateChange}
-                  minimumDate={
-                    tempStartDate
-                      ? new Date(tempStartDate.getTime() + 60 * 60 * 1000)
-                      : new Date()
-                  } // At least 1 hour after start
-                  style={styles.dateTimePicker}
-                />
-              </View>
-            )}
 
             {/* Android date and time pickers - shown natively and sequentially */}
             {Platform.OS === 'android' && showStartDatePicker && (

@@ -148,7 +148,7 @@ export const useAppleHealth = () => {
                 AppleHealthKit.getStepCount(
                   {
                     date: midnightToday.toISOString(),
-                    includeManuallyAdded: false,
+                    includeManuallyAdded: true,
                   },
                   (err, results) => {
                     if (err) {
