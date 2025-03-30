@@ -1,6 +1,6 @@
 # FitStake - Get Fit, Stake SOL, Earn Rewards! 💪💰
 
-![FitStake Demo](./fitstake.gif)
+<img src="./fitstake.gif" alt="FitStake Demo" width="400"/>
 
 [![Expo](https://img.shields.io/badge/Expo-52.0.39-blue.svg)](https://docs.expo.dev/)
 [![Solana](https://img.shields.io/badge/Solana-devnet-green.svg)](https://solana.com/)
