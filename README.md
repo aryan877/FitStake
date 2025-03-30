@@ -100,6 +100,23 @@ For Android:
 npm run android
 ```
 
+### Development Client Setup
+
+For development with custom modules, you'll need to build a development client:
+
+```bash
+# Install EAS CLI if not already installed
+npm install -g eas-cli
+
+# Build the development client
+cd fitstake-expo
+eas build --profile development --platform ios  # For iOS
+# OR
+eas build --profile development --platform android  # For Android
+```
+
+After building, you can run the development client on your device or simulator.
+
 ## 🖥️ Backend (fistake-backend)
 
 The backend handles:
