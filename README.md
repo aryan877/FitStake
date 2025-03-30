@@ -1,10 +1,14 @@
-# FitStake - Fitness Challenges with Solana Staking
+# FitStake - Get Fit, Stake SOL, Earn Rewards! 💪💰
+
+![FitStake Demo](./fitstake.gif)
 
 [![Expo](https://img.shields.io/badge/Expo-52.0.39-blue.svg)](https://docs.expo.dev/)
 [![Solana](https://img.shields.io/badge/Solana-devnet-green.svg)](https://solana.com/)
 [![Node.js](https://img.shields.io/badge/Node.js-v18+-yellow.svg)](https://nodejs.org/)
 
-FitStake is a fitness app that uses blockchain technology to incentivize users to complete fitness challenges. Users can stake SOL tokens on fitness goals and earn rewards upon completion.
+## Turn Your Fitness Journey into Financial Rewards!
+
+FitStake revolutionizes fitness motivation by combining exercise with cryptocurrency rewards. Stake SOL tokens on fitness challenges, complete your goals, and earn rewards - all secured by blockchain technology!
 
 ## 📱 Project Structure
 
