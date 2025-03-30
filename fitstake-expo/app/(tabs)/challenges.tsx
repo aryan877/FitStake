@@ -18,10 +18,11 @@ import EmptyState from '../components/EmptyState';
 import SolanaPriceDisplay from '../components/SolanaPriceDisplay';
 import { challengeApi } from '../services/api';
 import theme from '../theme';
-import { formatCountdown } from '../utils/dateFormatting';
+import { formatTimeDisplay } from '../utils/dateFormatting';
 import { showErrorToast } from '../utils/errorHandling';
 
-const { colors, spacing, borderRadius, fontSize, fontWeight, shadows } = theme;
+const { colors, spacing, borderRadius, fontSize, fontWeight, shadows, cards } =
+  theme;
 
 export default function MyChallengesScreen() {
   const { user } = usePrivy();
@@ -126,11 +127,20 @@ export default function MyChallengesScreen() {
       : item.claimed
       ? 'Claimed'
       : 'In Progress';
+
+    // Set colors based on challenge status
     const statusColor = item.completed
-      ? colors.accent.primary
+      ? colors.accent.success
       : item.claimed
       ? colors.accent.warning
       : colors.accent.primary;
+
+    // Set background color for status badge
+    const statusBgColor = item.completed
+      ? colors.status.completed
+      : item.claimed
+      ? colors.status.active
+      : colors.status.active;
 
     // Trim long descriptions
     const descriptionCharLimit = 120;
@@ -146,58 +156,88 @@ export default function MyChallengesScreen() {
       <Pressable
         style={styles.challengeCard}
         onPress={() => router.push(`/challenge/${item.id}`)}
+        android_ripple={{ color: 'transparent' }}
       >
-        <View style={styles.challengeHeader}>
-          <Text style={styles.challengeTitle}>{item.title}</Text>
-          <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
-            <Text style={styles.statusText}>{statusBadge}</Text>
+        <View style={styles.cardHeader}>
+          <View style={styles.headerLeft}>
+            <Text style={styles.challengeTitle}>{item.title}</Text>
+          </View>
+          <View
+            style={[
+              styles.statusBadge,
+              { backgroundColor: statusBgColor, borderColor: statusColor },
+            ]}
+          >
+            <Text style={[styles.statusText, { color: statusColor }]}>
+              {statusBadge}
+            </Text>
           </View>
         </View>
 
-        <Text style={styles.challengeDescription}>{trimmedDescription}</Text>
+        <View style={styles.contentContainer}>
+          <Text style={styles.challengeDescription}>{trimmedDescription}</Text>
 
-        <View style={styles.progressSection}>
-          <Text style={styles.progressText}>
-            Progress: {progressPercentage}%
-          </Text>
-          <View style={styles.progressBar}>
-            <View
-              style={[
-                styles.progressFill,
-                {
-                  width: `${progressPercentage}%`,
-                  backgroundColor: statusColor,
-                },
-              ]}
-            />
+          <View style={styles.progressContainer}>
+            <View style={styles.progressLabelRow}>
+              <Text style={styles.progressText}>Progress</Text>
+              <Text style={[styles.progressPercentage, { color: statusColor }]}>
+                {progressPercentage}%
+              </Text>
+            </View>
+            <View style={styles.progressBar}>
+              <View
+                style={[
+                  styles.progressFill,
+                  {
+                    width: `${progressPercentage}%`,
+                    backgroundColor: statusColor,
+                  },
+                ]}
+              />
+            </View>
           </View>
         </View>
 
-        <View style={styles.challengeDetails}>
-          <View style={styles.detailItem}>
-            <Trophy size={16} color={colors.gray[400]} />
-            <Text style={styles.detailText}>
-              Goal: {item.goal.value.toLocaleString()} {item.goal.unit}
+        <View style={styles.infoContainer}>
+          <View style={styles.infoSection}>
+            <View style={styles.iconLabelGroup}>
+              <Trophy size={14} color={statusColor} />
+              <Text style={styles.infoLabel}>Goal</Text>
+            </View>
+            <Text style={styles.infoValue}>
+              {item.goal.value.toLocaleString()} {item.goal.unit}
             </Text>
           </View>
 
-          <View style={styles.stakeContainer}>
-            <View style={styles.detailItem}>
-              <Text style={styles.detailText}>
-                Stake: {formatSolAmount(item.stakeAmount)} {item.token}
-              </Text>
+          <View style={styles.divider} />
+
+          <View style={styles.infoSection}>
+            <View style={styles.iconLabelGroup}>
+              <Text style={styles.infoLabel}>Stake</Text>
             </View>
-            <SolanaPriceDisplay
-              solAmount={solAmount}
-              compact={true}
-              variant="dark"
-              showSolAmount={false}
-            />
+            <View style={styles.stakeContainer}>
+              <Text style={styles.infoValue}>
+                {formatSolAmount(item.stakeAmount)} {item.token}
+              </Text>
+              <SolanaPriceDisplay
+                solAmount={solAmount}
+                compact={true}
+                variant="dark"
+                showSolAmount={false}
+              />
+            </View>
           </View>
 
-          <Text style={styles.timeRemaining}>
-            {formatCountdown(item.endTime)}
-          </Text>
+          <View style={styles.divider} />
+
+          <View style={styles.infoSection}>
+            <View style={styles.iconLabelGroup}>
+              <Text style={styles.infoLabel}>Time</Text>
+            </View>
+            <Text style={[styles.timeValue, { color: statusColor }]}>
+              {formatTimeDisplay(item.startTime, item.endTime)}
+            </Text>
+          </View>
         </View>
       </Pressable>
     );
@@ -232,6 +272,9 @@ export default function MyChallengesScreen() {
           style={[
             styles.filterButton,
             activeFilter === 'COMPLETED' && styles.activeFilterButton,
+            activeFilter === 'COMPLETED' && {
+              backgroundColor: colors.accent.success,
+            },
           ]}
           onPress={() => handleFilterChange('COMPLETED')}
         >
@@ -249,6 +292,9 @@ export default function MyChallengesScreen() {
           style={[
             styles.filterButton,
             activeFilter === 'FAILED' && styles.activeFilterButton,
+            activeFilter === 'FAILED' && {
+              backgroundColor: colors.accent.error,
+            },
           ]}
           onPress={() => handleFilterChange('FAILED')}
         >
@@ -321,7 +367,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
   },
   filterButton: {
-    paddingVertical: spacing.xs,
+    paddingVertical: spacing.xs + 2,
     paddingHorizontal: spacing.md,
     borderRadius: borderRadius.md,
     marginRight: spacing.sm,
@@ -337,6 +383,7 @@ const styles = StyleSheet.create({
   },
   activeFilterText: {
     color: colors.white,
+    fontWeight: fontWeight.semibold,
   },
   loadingContainer: {
     flex: 1,
@@ -355,77 +402,121 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xs,
   },
   challengeCard: {
-    backgroundColor: colors.gray[900],
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
+    ...cards.standard,
     marginBottom: spacing.md,
-    ...shadows.sm,
+    backgroundColor: colors.surface.card,
   },
-  challengeHeader: {
+  cardHeader: {
+    ...cards.header,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.sm,
+  },
+  headerLeft: {
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  contentContainer: {
+    padding: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
   },
   challengeTitle: {
     fontSize: fontSize.lg,
     fontWeight: fontWeight.bold,
     color: colors.white,
-    flex: 1,
+    lineHeight: 24,
   },
   statusBadge: {
     paddingVertical: spacing.xs / 2,
     paddingHorizontal: spacing.sm,
-    borderRadius: borderRadius.sm,
+    borderRadius: borderRadius.md,
+    minWidth: 90,
+    alignItems: 'center',
+    borderWidth: 1,
   },
   statusText: {
-    color: colors.white,
     fontSize: fontSize.xs,
-    fontWeight: fontWeight.medium,
+    fontWeight: fontWeight.bold,
   },
   challengeDescription: {
     fontSize: fontSize.sm,
     color: colors.gray[300],
+    lineHeight: 20,
     marginBottom: spacing.md,
   },
-  progressSection: {
-    marginBottom: spacing.md,
+  progressContainer: {
+    marginBottom: spacing.xs,
+  },
+  progressLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
   },
   progressText: {
     fontSize: fontSize.sm,
     color: colors.gray[300],
-    marginBottom: spacing.xs,
+    fontWeight: fontWeight.medium,
+  },
+  progressPercentage: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold,
   },
   progressBar: {
-    height: 8,
-    backgroundColor: colors.gray[800],
-    borderRadius: borderRadius.sm,
+    height: 6,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: borderRadius.full,
+    overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    borderRadius: borderRadius.sm,
+    borderRadius: borderRadius.full,
   },
-  challengeDetails: {
+  infoContainer: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(0,0,0,0.15)',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.04)',
+  },
+  infoSection: {
+    flex: 1,
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  iconLabelGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  detailItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
     gap: 4,
   },
-  detailText: {
-    color: colors.gray[300],
+  infoLabel: {
     fontSize: fontSize.xs,
-  },
-  timeRemaining: {
-    color: colors.accent.primary,
-    fontSize: fontSize.xs,
+    color: colors.gray[400],
     fontWeight: fontWeight.medium,
   },
+  infoValue: {
+    fontSize: fontSize.sm,
+    color: colors.white,
+    fontWeight: fontWeight.bold,
+    textAlign: 'center',
+  },
+  timeValue: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold,
+    textAlign: 'center',
+  },
+  divider: {
+    width: 1,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    height: '70%',
+    marginHorizontal: spacing.xs,
+  },
   stakeContainer: {
-    flexDirection: 'column',
-    alignItems: 'flex-start',
+    alignItems: 'center',
   },
 });

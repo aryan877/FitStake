@@ -87,7 +87,7 @@ export default function ProfileScreen() {
   const handleLogout = async () => {
     try {
       await logout();
-      router.replace('/');
+      router.replace('/sign-in');
     } catch (error) {
       console.error('Logout failed:', error);
     }
@@ -118,7 +118,7 @@ export default function ProfileScreen() {
         </Text>
         <Pressable
           style={styles.connectButton}
-          onPress={() => router.push('/')}
+          onPress={() => router.push('/sign-in')}
         >
           <Text style={styles.connectButtonText}>Connect Wallet</Text>
         </Pressable>

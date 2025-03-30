@@ -58,6 +58,13 @@ pub mod accountability {
             AccountingError::ChallengeCompleted
         );
         
+        // Verify challenge has started
+        let current_time = Clock::get()?.unix_timestamp;
+        require!(
+            current_time >= challenge.start_time,
+            AccountingError::ChallengeNotStarted
+        );
+        
         // Verify challenge has room for more participants
         require!(
             challenge.participant_count < challenge.max_participants,
@@ -404,6 +411,8 @@ pub enum AccountingError {
     ChallengeNotActive,
     #[msg("Challenge has not ended yet")]
     ChallengeNotEnded,
+    #[msg("Challenge has not started yet")]
+    ChallengeNotStarted,
     #[msg("Challenge is not completed")]
     ChallengeNotCompleted,
     #[msg("Participant has already completed the challenge")]

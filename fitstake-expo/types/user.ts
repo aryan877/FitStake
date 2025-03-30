@@ -29,10 +29,3 @@ export interface UserChallengeParams {
   limit?: number;
   status?: string;
 }
-
-interface LeaderboardParams {
-  page?: number;
-  limit?: number;
-  sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
-}

@@ -73,7 +73,10 @@
     },
     "extra": {
       "router": {
-        "origin": false
+        "origin": false,
+        "initialRouteName": "(tabs)",
+        "disableResetOnBlur": true,
+        "preserveNavigationState": true
       },
       "eas": {
         "projectId": "6c35e00c-8d8e-40ac-913e-5de494bde9cb"

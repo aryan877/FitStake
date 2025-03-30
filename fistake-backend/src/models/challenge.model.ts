@@ -45,6 +45,8 @@ export interface Challenge extends Document {
     healthData?: {
       date: string;
       steps: number;
+      startTime?: string; // ISO format date-time
+      endTime?: string; // ISO format date-time
       lastUpdated: Date;
     }[];
     progress?: number;
@@ -203,6 +205,12 @@ const ChallengeSchema: Schema = new Schema(
             steps: {
               type: Number,
               required: true,
+            },
+            startTime: {
+              type: String,
+            },
+            endTime: {
+              type: String,
             },
             lastUpdated: {
               type: Date,

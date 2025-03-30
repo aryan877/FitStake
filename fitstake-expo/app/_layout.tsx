@@ -116,6 +116,7 @@ function AppWithOnboarding() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="sign-in" />
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="challenge" />
         <Stack.Screen
           name="+not-found"
           options={{ presentation: 'modal', headerShown: true }}

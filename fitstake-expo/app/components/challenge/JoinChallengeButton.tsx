@@ -7,22 +7,38 @@ const { colors, spacing, borderRadius, fontSize, fontWeight, shadows } = theme;
 interface JoinChallengeButtonProps {
   onPress: () => void;
   isJoining: boolean;
+  disabled?: boolean;
+  hasStarted?: boolean;
 }
 
 export const JoinChallengeButton = ({
   onPress,
   isJoining,
+  disabled = false,
+  hasStarted = true,
 }: JoinChallengeButtonProps) => {
+  const isDisabled = isJoining || disabled;
+
+  const getButtonText = () => {
+    if (isJoining) return '';
+    if (!hasStarted) return 'Waiting for Challenge to Start';
+    return 'Join Challenge';
+  };
+
   return (
     <Pressable
-      style={[styles.button, isJoining && styles.disabledButton]}
+      style={[
+        styles.button,
+        isDisabled && styles.disabledButton,
+        !hasStarted && styles.notStartedButton,
+      ]}
       onPress={onPress}
-      disabled={isJoining}
+      disabled={isDisabled}
     >
       {isJoining ? (
         <ActivityIndicator size="small" color={colors.white} />
       ) : (
-        <Text style={styles.buttonText}>Join Challenge</Text>
+        <Text style={styles.buttonText}>{getButtonText()}</Text>
       )}
     </Pressable>
   );
@@ -45,6 +61,9 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.6,
+  },
+  notStartedButton: {
+    backgroundColor: colors.gray[700],
   },
 });
 

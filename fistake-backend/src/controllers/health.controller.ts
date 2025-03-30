@@ -75,6 +75,9 @@ export const submitHealthData = async (
     const processedData = healthData.map((item: any) => {
       const date = item.date;
       const steps = Number(item.count) || 0;
+      // Capture time boundaries if available
+      const startTime = item.startTime || null;
+      const endTime = item.endTime || null;
 
       // Basic verification checks (common for both platforms)
       const hasReasonableStepCount = steps >= 0 && steps <= 100000;
@@ -132,26 +135,32 @@ export const submitHealthData = async (
             );
           }
 
-          // Check record timestamps
-          const startDate = new Date(date);
-          startDate.setHours(0, 0, 0, 0);
-          const endDate = new Date(date);
-          endDate.setHours(23, 59, 59, 999);
+          // Check record timestamps if time range provided
+          if (startTime && endTime) {
+            const startDateTime = new Date(startTime);
+            const endDateTime = new Date(endTime);
 
-          const recordsWithInvalidTimes = item.records.filter((record: any) => {
-            const startTime = new Date(record.startTime);
-            const endTime = new Date(record.endTime);
-            const isWithinDay = startTime >= startDate && endTime <= endDate;
-            const durationMs = endTime.getTime() - startTime.getTime();
-            const durationIsReasonable = durationMs > 0 && durationMs < 3600000; // < 1 hour
-            return !isWithinDay || !durationIsReasonable;
-          });
-
-          if (recordsWithInvalidTimes.length > 0) {
-            isSuspicious = true;
-            anomalyDetails.push(
-              `${recordsWithInvalidTimes.length} records have suspicious timestamps`
+            const recordsWithInvalidTimes = item.records.filter(
+              (record: any) => {
+                const recordStartTime = new Date(record.startTime);
+                const recordEndTime = new Date(record.endTime);
+                const isWithinRange =
+                  recordStartTime >= startDateTime &&
+                  recordEndTime <= endDateTime;
+                const durationMs =
+                  recordEndTime.getTime() - recordStartTime.getTime();
+                const durationIsReasonable =
+                  durationMs > 0 && durationMs < 3600000; // < 1 hour
+                return !isWithinRange || !durationIsReasonable;
+              }
             );
+
+            if (recordsWithInvalidTimes.length > 0) {
+              isSuspicious = true;
+              anomalyDetails.push(
+                `${recordsWithInvalidTimes.length} records have suspicious timestamps outside the reported time range`
+              );
+            }
           }
 
           // Check data sources
@@ -198,11 +207,18 @@ export const submitHealthData = async (
         ? steps
         : 0; // Full verification for Android
 
-      return {
+      // Create the health data record with time boundaries if available
+      const healthRecord: any = {
         date,
         steps: finalStepCount,
         lastUpdated: new Date(),
       };
+
+      // Add time boundaries if provided
+      if (startTime) healthRecord.startTime = startTime;
+      if (endTime) healthRecord.endTime = endTime;
+
+      return healthRecord;
     });
 
     // Update participant data
@@ -295,6 +311,8 @@ export const getProgress = async (
           (item: BackendHealthData): FrontendHealthData => ({
             date: item.date,
             count: item.steps,
+            startTime: item.startTime,
+            endTime: item.endTime,
           })
         )
       : [];

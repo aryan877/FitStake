@@ -97,7 +97,7 @@ export const useAppleHealth = () => {
     }
   }, [isInitialized, checkPermissions]);
 
-  // Fetch steps data for a specific date range
+  // Fetch steps data for a specific date-time range
   const fetchStepsForDateRange = useCallback(
     async (startDate: Date, endDate: Date) => {
       if (!isIOS) {
@@ -123,115 +123,131 @@ export const useAppleHealth = () => {
       setError(null);
 
       try {
-        const dayDiff = Math.ceil(
-          (endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24)
-        );
-        const results: StepsData[] = [];
+        // Use the exact time boundaries provided
+        const start = new Date(startDate);
+        const end = new Date(endDate);
 
-        // Clone start date to avoid modifying the input
-        const currentDate = new Date(startDate);
-        currentDate.setHours(0, 0, 0, 0); // Ensure we start at midnight
+        // For daily totals, use the more accurate getStepCount if the range is for a full day
+        const isFullDay =
+          start.getHours() === 0 &&
+          start.getMinutes() === 0 &&
+          start.getSeconds() === 0 &&
+          end.getHours() === 23 &&
+          end.getMinutes() === 59;
 
-        // Process each day in parallel for better performance
-        const promises = Array.from({ length: dayDiff + 1 }, async (_, i) => {
-          const date = new Date(currentDate);
-          date.setDate(currentDate.getDate() + i);
-          const dateString = date.toISOString().split('T')[0];
-          const displayDate = date.toLocaleDateString();
+        let totalSteps = 0;
 
-          try {
-            const midnightToday = new Date(date);
-            midnightToday.setHours(0, 0, 0, 0);
+        if (isFullDay) {
+          // Use getStepCount for a single day, which is more reliable for daily totals
+          totalSteps = await new Promise<number>((resolve) => {
+            AppleHealthKit.getStepCount(
+              {
+                date: start.toISOString(),
+                includeManuallyAdded: true,
+              },
+              (err, results) => {
+                if (err) {
+                  console.error('Error fetching step count:', err);
+                  resolve(0);
+                  return;
+                }
+                resolve(results?.value || 0);
+              }
+            );
+          });
+        }
 
-            const [stepCount, detailedSteps] = await Promise.all([
-              new Promise<any>((resolve) => {
-                AppleHealthKit.getStepCount(
-                  {
-                    date: midnightToday.toISOString(),
-                    includeManuallyAdded: true,
-                  },
-                  (err, results) => {
-                    if (err) {
-                      console.error(
-                        `Error fetching steps for ${displayDate}:`,
-                        err
-                      );
-                      resolve({ value: 0 });
-                      return;
-                    }
-                    resolve(results || { value: 0 });
-                  }
+        // Get all step samples within the exact time range (for details or non-daily ranges)
+        const detailedSteps = await new Promise<any>((resolve) => {
+          AppleHealthKit.getDailyStepCountSamples(
+            {
+              startDate: start.toISOString(),
+              endDate: end.toISOString(),
+              includeManuallyAdded: true,
+            },
+            (err, results) => {
+              if (err) {
+                console.error(
+                  `Error fetching step samples for time range:`,
+                  err
                 );
-              }),
-              new Promise<any>((resolve) => {
-                AppleHealthKit.getDailyStepCountSamples(
-                  {
-                    startDate: midnightToday.toISOString(),
-                    endDate: new Date(
-                      midnightToday.getTime() + 86399999
-                    ).toISOString(),
-                  },
-                  (err, results) => {
-                    if (err) {
-                      console.error(
-                        `Error fetching step samples for ${displayDate}:`,
-                        err
-                      );
-                      resolve([]);
-                      return;
-                    }
-                    resolve(results || []);
-                  }
-                );
-              }),
-            ]);
-
-            const dataSources = new Set<string>();
-            const recordCount = detailedSteps.length || 0;
-            const timestamps: number[] = [];
-            const individualRecords: StepRecord[] = [];
-
-            if (recordCount > 0) {
-              detailedSteps.forEach((record: any) => {
-                if (record.source) dataSources.add(record.source);
-                if (record.startDate)
-                  timestamps.push(new Date(record.startDate).getTime());
-                individualRecords.push({
-                  count: record.value || 0,
-                  startTime: record.startDate,
-                  endTime: record.endDate,
-                  dataOrigin: record.source,
-                  id: record.id || `${record.startDate}-${record.endDate}`,
-                });
-              });
+                resolve([]);
+                return;
+              }
+              resolve(results || []);
             }
-
-            return {
-              date: displayDate,
-              dateISO: dateString,
-              count: stepCount.value || 0,
-              sources: Array.from(dataSources),
-              recordCount,
-              timestamps: timestamps.slice(0, 10),
-              records: individualRecords,
-            };
-          } catch (err) {
-            console.error(`Error processing steps for ${displayDate}:`, err);
-            return {
-              date: displayDate,
-              dateISO: dateString,
-              count: 0,
-              sources: [],
-              recordCount: 0,
-              timestamps: [],
-              records: [],
-            };
-          }
+          );
         });
 
-        const processedResults = await Promise.all(promises);
-        results.push(...processedResults);
+        // Create a display date format that shows the time range
+        const formatDateTime = (date: Date) => {
+          return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+          })}`;
+        };
 
+        const displayDate = `${formatDateTime(start)} - ${formatDateTime(end)}`;
+
+        // Process all records in the time range
+        const dataSources = new Set<string>();
+        const recordCount = detailedSteps.length || 0;
+        const timestamps: number[] = [];
+        const individualRecords: StepRecord[] = [];
+
+        // Process records
+        if (recordCount > 0) {
+          detailedSteps.forEach((record: any) => {
+            if (record.metadata?.[0]?.sourceId) {
+              dataSources.add(record.metadata[0].sourceId);
+            } else if (record.metadata?.[0]?.sourceName) {
+              dataSources.add(record.metadata[0].sourceName);
+            }
+
+            if (record.startDate) {
+              timestamps.push(new Date(record.startDate).getTime());
+            }
+
+            individualRecords.push({
+              count: record.value || 0,
+              startTime: record.startDate || '',
+              endTime: record.endTime || '',
+              dataOrigin: record.metadata?.[0]?.sourceName || '',
+              id:
+                record.startDate && record.endTime
+                  ? `${record.startDate}-${record.endTime}`
+                  : `record-${Date.now()}-${Math.random()}`,
+            });
+          });
+        }
+
+        // If we didn't get total steps from getStepCount (non-daily range), calculate from samples
+        if (!isFullDay || totalSteps === 0) {
+          totalSteps = individualRecords.reduce(
+            (sum, record) => sum + record.count,
+            0
+          );
+        }
+
+        // Get the date for ISO format - normalize to the start date's calendar day
+        const dateForIso = new Date(start);
+        dateForIso.setHours(0, 0, 0, 0);
+        const dateIso = dateForIso.toISOString().split('T')[0]; // YYYY-MM-DD
+
+        // Create the result object
+        const result: StepsData = {
+          date: displayDate,
+          dateISO: dateIso,
+          count: totalSteps,
+          startTime: start.toISOString(),
+          endTime: end.toISOString(),
+          sources: Array.from(dataSources),
+          recordCount,
+          timestamps: timestamps.slice(0, 10),
+          records: individualRecords,
+        };
+
+        const results = [result];
         setStepsData(results);
         return results;
       } catch (err) {
@@ -244,22 +260,6 @@ export const useAppleHealth = () => {
     },
     [isInitialized, hasPermissions, initialize, requestPermissions]
   );
-
-  // Fetch steps data for the last 7 days
-  const fetchStepsData = useCallback(async () => {
-    if (!isIOS || !isInitialized || !hasPermissions) return [];
-
-    // Use the more reliable date range function to get last 7 days
-    const endDate = new Date(); // Now
-    const startDate = new Date();
-    startDate.setDate(endDate.getDate() - 6); // Last 7 days (including today)
-
-    // Reset hours to midnight for consistent day boundaries
-    startDate.setHours(0, 0, 0, 0);
-    endDate.setHours(23, 59, 59, 999);
-
-    return fetchStepsForDateRange(startDate, endDate);
-  }, [isInitialized, hasPermissions, fetchStepsForDateRange]);
 
   // Get steps data for the last week (for challenge progress tracking)
   const getStepsForLastWeek = useCallback(async () => {
@@ -278,24 +278,132 @@ export const useAppleHealth = () => {
       }
     }
 
-    // Use the more reliable date range function to get last 7 days
-    const endDate = new Date(); // Now
-    const startDate = new Date();
-    startDate.setDate(endDate.getDate() - 6); // Last 7 days (including today)
+    try {
+      setLoading(true);
 
-    // Ensure proper day boundaries for consistent aggregation
-    startDate.setHours(0, 0, 0, 0); // Midnight start
-    endDate.setHours(23, 59, 59, 999); // End of day
+      // Get steps for each day in the last week individually
+      const now = new Date();
+      const results: StepsData[] = [];
 
-    // Call our reliable function to fetch the data
-    return fetchStepsForDateRange(startDate, endDate);
+      // Process the last 7 days (including today)
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(now);
+        date.setDate(now.getDate() - i);
+
+        // Set to midnight for start and end of day
+        const dayStart = new Date(date);
+        dayStart.setHours(0, 0, 0, 0);
+
+        const dayEnd = new Date(date);
+        dayEnd.setHours(23, 59, 59, 999);
+
+        // Format dates for consistency
+        const dateISO = dayStart.toISOString().split('T')[0]; // YYYY-MM-DD
+        const dateString = dayStart.toLocaleDateString('en-US'); // MM/DD/YYYY
+
+        // Get daily step count using getStepCount
+        const dailySteps = await new Promise<number>((resolve) => {
+          AppleHealthKit.getStepCount(
+            {
+              date: dayStart.toISOString(),
+              includeManuallyAdded: true,
+            },
+            (err, results) => {
+              if (err) {
+                console.error(
+                  `Error fetching step count for day ${dateString}:`,
+                  err
+                );
+                resolve(0);
+                return;
+              }
+              resolve(results?.value || 0);
+            }
+          );
+        });
+
+        // Get detailed samples for the day
+        const detailedSamples = await new Promise<any[]>((resolve) => {
+          AppleHealthKit.getDailyStepCountSamples(
+            {
+              startDate: dayStart.toISOString(),
+              endDate: dayEnd.toISOString(),
+              includeManuallyAdded: true,
+            },
+            (err, results) => {
+              if (err) {
+                console.error(
+                  `Error fetching step samples for day ${dateString}:`,
+                  err
+                );
+                resolve([]);
+                return;
+              }
+              resolve(results || []);
+            }
+          );
+        });
+
+        // Process detailed samples for this day
+        const dataSources = new Set<string>();
+        const timestamps: number[] = [];
+        const records: StepRecord[] = [];
+
+        if (detailedSamples.length > 0) {
+          detailedSamples.forEach((sample) => {
+            // Extract source information
+            if (sample.metadata?.[0]?.sourceId) {
+              dataSources.add(sample.metadata[0].sourceId);
+            } else if (sample.metadata?.[0]?.sourceName) {
+              dataSources.add(sample.metadata[0].sourceName);
+            }
+
+            // Add timestamp
+            if (sample.startDate) {
+              timestamps.push(new Date(sample.startDate).getTime());
+            }
+
+            // Create record
+            records.push({
+              count: sample.value || 0,
+              startTime: sample.startDate || '',
+              endTime: sample.endDate || '',
+              dataOrigin: sample.metadata?.[0]?.sourceName || '',
+              id:
+                sample.metadata?.[0]?.sourceId ||
+                `record-${Date.now()}-${Math.random()}`,
+            });
+          });
+        }
+
+        // Create a standardized record for this day
+        results.push({
+          date: dateString,
+          dateISO: dateISO,
+          count: dailySteps,
+          startTime: dayStart.toISOString(),
+          endTime: dayEnd.toISOString(),
+          sources: Array.from(dataSources),
+          recordCount: detailedSamples.length,
+          timestamps: timestamps.slice(0, 10),
+          records: records,
+        });
+      }
+
+      setStepsData(results);
+      return results;
+    } catch (error) {
+      console.error('Error fetching steps for last week:', error);
+      return [];
+    } finally {
+      setLoading(false);
+    }
   }, [
     isInitialized,
     hasPermissions,
     initialize,
     checkPermissions,
     requestPermissions,
-    fetchStepsForDateRange,
   ]);
 
   // Improved setup function with better error handling
@@ -307,12 +415,7 @@ export const useAppleHealth = () => {
       setupCompleted.current = false;
       setError(null);
 
-      // Use the improved function for fetching data
-      const endDate = new Date(); // Now
-      const startDate = new Date();
-      startDate.setDate(endDate.getDate() - 6); // Last 7 days (including today)
-
-      await fetchStepsForDateRange(startDate, endDate);
+      await getStepsForLastWeek();
       setupCompleted.current = true;
       return true;
     } catch (error) {
@@ -320,7 +423,7 @@ export const useAppleHealth = () => {
       setError('Failed to set up Apple Health integration');
       return false;
     }
-  }, [initialize, requestPermissions, fetchStepsForDateRange]);
+  }, [getStepsForLastWeek]);
 
   useEffect(() => {
     if (isIOS && !setupCompleted.current) {
@@ -337,16 +440,7 @@ export const useAppleHealth = () => {
         hasPerms = await requestPermissions();
       }
       if (hasPerms) {
-        // Use improved function for getting step data
-        const endDate = new Date(); // Now
-        const startDate = new Date();
-        startDate.setDate(endDate.getDate() - 6); // Last 7 days (including today)
-
-        // Ensure proper day boundaries
-        startDate.setHours(0, 0, 0, 0);
-        endDate.setHours(23, 59, 59, 999);
-
-        return fetchStepsForDateRange(startDate, endDate);
+        return getStepsForLastWeek();
       }
     } else {
       await setupAppleHealth();
@@ -357,7 +451,7 @@ export const useAppleHealth = () => {
     checkPermissions,
     requestPermissions,
     setupAppleHealth,
-    fetchStepsForDateRange,
+    getStepsForLastWeek,
   ]);
 
   return {
@@ -369,7 +463,6 @@ export const useAppleHealth = () => {
     error,
     initialize,
     requestPermissions,
-    fetchStepsData,
     fetchStepsForDateRange,
     setupAppleHealth,
     refreshStepsData,

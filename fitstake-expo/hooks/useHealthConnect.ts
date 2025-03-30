@@ -62,114 +62,7 @@ export const useHealthConnect = () => {
     }
   }, [isInitialized]);
 
-  const fetchStepsDataDirect = async (permissionsGranted: boolean) => {
-    if (!isAndroid || !isInitialized || !permissionsGranted) return [];
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const { aggregateRecord, readRecords } = await import(
-        'react-native-health-connect'
-      );
-      const results: StepsData[] = [];
-      const today = new Date();
-
-      for (let i = 6; i >= 0; i--) {
-        const date = new Date();
-        date.setDate(today.getDate() - i);
-        const displayDate = date.toLocaleDateString();
-
-        const startDate = new Date(date);
-        startDate.setHours(0, 0, 0, 0);
-
-        const endDate = new Date(date);
-        endDate.setHours(23, 59, 59, 999);
-
-        try {
-          // Get aggregated steps for the day
-          const aggregatedSteps = await aggregateRecord({
-            recordType: 'Steps',
-            timeRangeFilter: {
-              operator: 'between',
-              startTime: startDate.toISOString(),
-              endTime: endDate.toISOString(),
-            },
-          });
-
-          // Get records for collecting source information
-          const stepsResponse = await readRecords('Steps', {
-            timeRangeFilter: {
-              operator: 'between',
-              startTime: startDate.toISOString(),
-              endTime: endDate.toISOString(),
-            },
-          });
-
-          const totalSteps = aggregatedSteps.COUNT_TOTAL || 0;
-          const dataSources = new Set<string>();
-          const recordCount = stepsResponse?.records?.length || 0;
-
-          // New: store individual records for enhanced verification
-          const individualRecords: StepRecord[] = [];
-
-          // Collect data sources to send to backend
-          if (recordCount > 0) {
-            stepsResponse.records.forEach((record) => {
-              if (record.metadata?.dataOrigin) {
-                dataSources.add(record.metadata.dataOrigin);
-              }
-
-              // Add each record as an individual entry
-              individualRecords.push({
-                count: record.count,
-                startTime: record.startTime,
-                endTime: record.endTime,
-                recordingMethod: record.metadata?.recordingMethod,
-                dataOrigin: record.metadata?.dataOrigin,
-                id: record.metadata?.id,
-                lastModifiedTime: record.metadata?.lastModifiedTime,
-              });
-            });
-          }
-
-          // Add enhanced data for backend verification
-          results.push({
-            date: displayDate,
-            count: totalSteps,
-            sources: Array.from(dataSources),
-            recordCount,
-            records: individualRecords,
-          });
-        } catch (dayErr) {
-          console.error(`Error fetching steps for ${displayDate}:`, dayErr);
-          results.push({
-            date: displayDate,
-            count: 0,
-            sources: [],
-            recordCount: 0,
-            records: [],
-          });
-        }
-      }
-
-      setStepsData(results);
-      setLoading(false);
-      return results;
-    } catch (err) {
-      console.error('Failed to fetch steps data:', err);
-      setError('Failed to fetch steps data');
-      setLoading(false);
-      return [];
-    }
-  };
-
-  const fetchStepsData = useCallback(async () => {
-    if (!isAndroid || !isInitialized || !hasPermissions) return [];
-    return fetchStepsDataDirect(true);
-  }, [isInitialized, hasPermissions]);
-
-  // Fetch steps data for a specific date range
+  // Fetch steps data for a specific date-time range
   const fetchStepsForDateRange = useCallback(
     async (startDate: Date, endDate: Date) => {
       if (!isAndroid) {
@@ -198,104 +91,87 @@ export const useHealthConnect = () => {
         const { aggregateRecord, readRecords } = await import(
           'react-native-health-connect'
         );
-        const results: StepsData[] = [];
 
-        // Clone dates to avoid modifying the original
+        // Use the exact time boundaries provided
         const start = new Date(startDate);
         const end = new Date(endDate);
 
-        // Set time to beginning and end of day
-        start.setHours(0, 0, 0, 0);
-        end.setHours(23, 59, 59, 999);
+        // Get steps for the exact time range specified
+        const [aggregatedSteps, stepsResponse] = await Promise.all([
+          aggregateRecord({
+            recordType: 'Steps',
+            timeRangeFilter: {
+              operator: 'between',
+              startTime: start.toISOString(),
+              endTime: end.toISOString(),
+            },
+          }),
+          readRecords('Steps', {
+            timeRangeFilter: {
+              operator: 'between',
+              startTime: start.toISOString(),
+              endTime: end.toISOString(),
+            },
+          }),
+        ]);
 
-        // Calculate number of days in range
-        const dayDiff = Math.ceil(
-          (end.getTime() - start.getTime()) / (1000 * 3600 * 24)
-        );
+        const totalSteps = aggregatedSteps.COUNT_TOTAL || 0;
+        const dataSources = new Set<string>();
+        const recordCount = stepsResponse?.records?.length || 0;
+        const timestamps: number[] = [];
+        const individualRecords: StepRecord[] = [];
 
-        // Process each day in parallel for better performance
-        const promises = Array.from({ length: dayDiff + 1 }, async (_, i) => {
-          const date = new Date(start);
-          date.setDate(start.getDate() + i);
-          const displayDate = date.toLocaleDateString();
-
-          const dayStart = new Date(date);
-          dayStart.setHours(0, 0, 0, 0);
-
-          const dayEnd = new Date(date);
-          dayEnd.setHours(23, 59, 59, 999);
-
-          try {
-            const [aggregatedSteps, stepsResponse] = await Promise.all([
-              aggregateRecord({
-                recordType: 'Steps',
-                timeRangeFilter: {
-                  operator: 'between',
-                  startTime: dayStart.toISOString(),
-                  endTime: dayEnd.toISOString(),
-                },
-              }),
-              readRecords('Steps', {
-                timeRangeFilter: {
-                  operator: 'between',
-                  startTime: dayStart.toISOString(),
-                  endTime: dayEnd.toISOString(),
-                },
-              }),
-            ]);
-
-            const totalSteps = aggregatedSteps.COUNT_TOTAL || 0;
-            const dataSources = new Set<string>();
-            const recordCount = stepsResponse?.records?.length || 0;
-            const timestamps: number[] = [];
-            const individualRecords: StepRecord[] = [];
-
-            if (recordCount > 0) {
-              stepsResponse.records.forEach((record) => {
-                if (record.metadata?.dataOrigin) {
-                  dataSources.add(record.metadata.dataOrigin);
-                }
-
-                if (record.startTime) {
-                  timestamps.push(new Date(record.startTime).getTime());
-                }
-
-                individualRecords.push({
-                  count: record.count,
-                  startTime: record.startTime,
-                  endTime: record.endTime,
-                  recordingMethod: record.metadata?.recordingMethod,
-                  dataOrigin: record.metadata?.dataOrigin,
-                  id: record.metadata?.id,
-                  lastModifiedTime: record.metadata?.lastModifiedTime,
-                });
-              });
+        if (recordCount > 0) {
+          stepsResponse.records.forEach((record) => {
+            if (record.metadata?.dataOrigin) {
+              dataSources.add(record.metadata.dataOrigin);
             }
 
-            return {
-              date: displayDate,
-              count: totalSteps,
-              sources: Array.from(dataSources),
-              recordCount,
-              timestamps: timestamps.slice(0, 10),
-              records: individualRecords,
-            };
-          } catch (err) {
-            console.error(`Error processing steps for ${displayDate}:`, err);
-            return {
-              date: displayDate,
-              count: 0,
-              sources: [],
-              recordCount: 0,
-              timestamps: [],
-              records: [],
-            };
-          }
-        });
+            if (record.startTime) {
+              timestamps.push(new Date(record.startTime).getTime());
+            }
 
-        const processedResults = await Promise.all(promises);
-        results.push(...processedResults);
+            individualRecords.push({
+              count: record.count,
+              startTime: record.startTime,
+              endTime: record.endTime,
+              recordingMethod: record.metadata?.recordingMethod,
+              dataOrigin: record.metadata?.dataOrigin,
+              id: record.metadata?.id,
+              lastModifiedTime: record.metadata?.lastModifiedTime,
+            });
+          });
+        }
 
+        // Create a display date format that shows the time range
+        const formatDateTime = (date: Date) => {
+          return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+          })}`;
+        };
+
+        const displayDate = `${formatDateTime(start)} - ${formatDateTime(end)}`;
+
+        // Get the date for ISO format - normalize to the start date's calendar day
+        const dateForIso = new Date(start);
+        dateForIso.setHours(0, 0, 0, 0);
+        const dateIso = dateForIso.toISOString().split('T')[0]; // YYYY-MM-DD
+
+        // Create the result object
+        const result: StepsData = {
+          date: displayDate,
+          dateISO: dateIso,
+          count: totalSteps,
+          startTime: start.toISOString(),
+          endTime: end.toISOString(),
+          sources: Array.from(dataSources),
+          recordCount,
+          timestamps: timestamps.slice(0, 10),
+          records: individualRecords,
+        };
+
+        const results = [result];
         setStepsData(results);
         return results;
       } catch (err) {
@@ -326,13 +202,57 @@ export const useHealthConnect = () => {
       }
     }
 
-    // Use the reliable date range function to get last 7 days
-    const endDate = new Date(); // Now
-    const startDate = new Date();
-    startDate.setDate(endDate.getDate() - 6); // Last 7 days (including today)
+    try {
+      setLoading(true);
 
-    // Call our more reliable function to fetch the data
-    return fetchStepsForDateRange(startDate, endDate);
+      // Get steps for each day in the last week individually
+      const now = new Date();
+      const results: StepsData[] = [];
+
+      // Process the last 7 days (including today)
+      for (let i = 0; i < 7; i++) {
+        const endDate = new Date(now);
+        endDate.setDate(now.getDate() - i);
+        endDate.setHours(23, 59, 59, 999); // End of day
+
+        const startDate = new Date(endDate);
+        startDate.setHours(0, 0, 0, 0); // Start of day
+
+        // Get steps for this specific day
+        const dayData = await fetchStepsForDateRange(startDate, endDate);
+
+        if (dayData && dayData.length > 0) {
+          // Update the date ISO to just the date part for easier matching
+          const dayRecord = {
+            ...dayData[0],
+            dateISO: startDate.toISOString().split('T')[0], // YYYY-MM-DD format
+            date: startDate.toLocaleDateString('en-US'), // MM/DD/YYYY format
+          };
+          results.push(dayRecord);
+        } else {
+          // Add empty record for this day
+          results.push({
+            date: startDate.toLocaleDateString('en-US'),
+            dateISO: startDate.toISOString().split('T')[0],
+            count: 0,
+            startTime: startDate.toISOString(),
+            endTime: endDate.toISOString(),
+            sources: [],
+            recordCount: 0,
+            timestamps: [],
+            records: [],
+          });
+        }
+      }
+
+      setStepsData(results);
+      return results;
+    } catch (error) {
+      console.error('Error fetching steps for last week:', error);
+      return [];
+    } finally {
+      setLoading(false);
+    }
   }, [
     isInitialized,
     hasPermissions,
@@ -352,21 +272,11 @@ export const useHealthConnect = () => {
         hasPerms = await requestPermissions();
       }
       if (hasPerms) {
-        // Use the improved function for fetching data
-        const endDate = new Date(); // Now
-        const startDate = new Date();
-        startDate.setDate(endDate.getDate() - 6); // Last 7 days (including today)
-
-        await fetchStepsForDateRange(startDate, endDate);
+        await getStepsForLastWeek();
         setupCompleted.current = true;
       }
     }
-  }, [
-    initialize,
-    checkPermissions,
-    requestPermissions,
-    fetchStepsForDateRange,
-  ]);
+  }, [initialize, checkPermissions, requestPermissions, getStepsForLastWeek]);
 
   useEffect(() => {
     if (isAndroid && !setupCompleted.current) {
@@ -383,12 +293,7 @@ export const useHealthConnect = () => {
         hasPerms = await requestPermissions();
       }
       if (hasPerms) {
-        // Use the improved function for fetching data
-        const endDate = new Date(); // Now
-        const startDate = new Date();
-        startDate.setDate(endDate.getDate() - 6); // Last 7 days (including today)
-
-        return fetchStepsForDateRange(startDate, endDate);
+        return getStepsForLastWeek();
       }
     } else {
       await setupHealthConnect();
@@ -399,7 +304,7 @@ export const useHealthConnect = () => {
     checkPermissions,
     requestPermissions,
     setupHealthConnect,
-    fetchStepsForDateRange,
+    getStepsForLastWeek,
   ]);
 
   return {
@@ -411,7 +316,6 @@ export const useHealthConnect = () => {
     error,
     initialize,
     requestPermissions,
-    fetchStepsData,
     fetchStepsForDateRange,
     setupHealthConnect,
     refreshStepsData,

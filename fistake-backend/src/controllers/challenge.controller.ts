@@ -29,6 +29,11 @@ export const getChallenges = async (
       visibility = "public",
     } = req.query;
 
+    // Get user if authenticated
+    const userId = req.user?.did;
+    const user = userId ? await UserModel.findOne({ privyId: userId }) : null;
+    const userWalletAddress = user?.walletAddress;
+
     const skip = (Number(page) - 1) * Number(limit);
 
     // Build sort options
@@ -43,7 +48,22 @@ export const getChallenges = async (
     if (visibility === "public") {
       query.isPublic = true;
     } else if (visibility === "private") {
+      // For private challenges, only return those where user is a participant or creator
       query.isPublic = false;
+      if (userWalletAddress) {
+        query.$or = [
+          { "participants.walletAddress": userWalletAddress },
+          { authority: userWalletAddress },
+        ];
+      } else {
+        // If no authenticated user, return 401 error
+        return next(
+          new ApiError(
+            401,
+            "Authentication required to access private challenges"
+          )
+        );
+      }
     }
 
     // Handle search
@@ -427,6 +447,12 @@ export const joinChallenge = async (
 
     if (!challenge) {
       return next(new ApiError(404, "Challenge not found"));
+    }
+
+    // Check if challenge has started
+    const currentTime = Math.floor(Date.now() / 1000); // Current time in seconds
+    if (currentTime < challenge.startTime) {
+      return next(new ApiError(400, "Challenge has not started yet"));
     }
 
     // Check if challenge is active

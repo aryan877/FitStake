@@ -17,12 +17,16 @@ export interface FrontendHealthData {
   sources?: string[];
   recordCount?: number;
   timestamps?: number[];
+  startTime?: string;
+  endTime?: string;
 }
 
 // Backend health data structure (stored in database)
 export interface BackendHealthData {
   date: string;
   steps: number;
+  startTime?: string;
+  endTime?: string;
   lastUpdated: Date;
 }
 

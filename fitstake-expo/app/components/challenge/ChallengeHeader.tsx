@@ -16,6 +16,9 @@ export const ChallengeHeader = ({
   timeRemaining,
   onBack,
 }: ChallengeHeaderProps) => {
+  // Determine if this is a "Starts in" countdown based on the string content
+  const isStartingCountdown = timeRemaining.startsWith('Starts in');
+
   return (
     <View style={styles.header}>
       <Pressable style={styles.backButton} onPress={onBack}>
@@ -25,7 +28,14 @@ export const ChallengeHeader = ({
         {title}
       </Text>
       <View style={styles.timeRemainingContainer}>
-        <Text style={styles.timeRemaining}>{timeRemaining}</Text>
+        <Text
+          style={[
+            styles.timeRemaining,
+            isStartingCountdown && styles.startsInText,
+          ]}
+        >
+          {timeRemaining}
+        </Text>
       </View>
     </View>
   );
@@ -61,6 +71,9 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     color: colors.accent.primary,
     fontWeight: fontWeight.medium,
+  },
+  startsInText: {
+    color: colors.accent.secondary,
   },
 });
 

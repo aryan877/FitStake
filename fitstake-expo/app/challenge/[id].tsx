@@ -29,7 +29,11 @@ import { ProgressCard } from '../components/challenge/ProgressCard';
 import { StepHistoryCard } from '../components/challenge/StepHistoryCard';
 import { authApi } from '../services/api';
 import theme from '../theme';
-import { formatCountdown, formatDate } from '../utils/dateFormatting';
+import {
+  formatDate,
+  formatTimeDisplay,
+  hasStarted,
+} from '../utils/dateFormatting';
 import { showErrorToast, showSuccessToast } from '../utils/errorHandling';
 
 const { colors, spacing } = theme;
@@ -66,6 +70,7 @@ export default function ChallengeDetailsScreen() {
     null
   );
   const [currentTimeRemaining, setCurrentTimeRemaining] = useState<string>('');
+  const [challengeHasStarted, setChallengeHasStarted] = useState(false);
 
   // Timer ref for cleanup
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -79,12 +84,18 @@ export default function ChallengeDetailsScreen() {
   // Update time remaining
   const updateTimeRemaining = useCallback(() => {
     if (challenge) {
-      setCurrentTimeRemaining(formatCountdown(challenge.endTime));
+      setCurrentTimeRemaining(
+        formatTimeDisplay(challenge.startTime, challenge.endTime)
+      );
+
+      // Update hasStarted status
+      setChallengeHasStarted(hasStarted(challenge.startTime));
     }
   }, [challenge]);
 
   // Setup timer for live countdown
   useEffect(() => {
+    console.log('setting up timer');
     // Initial update
     updateTimeRemaining();
 
@@ -111,7 +122,9 @@ export default function ChallengeDetailsScreen() {
         setChallenge(challengeData);
 
         // Update time remaining immediately
-        setCurrentTimeRemaining(formatCountdown(challengeData.endTime));
+        setCurrentTimeRemaining(
+          formatTimeDisplay(challengeData.startTime, challengeData.endTime)
+        );
 
         // Check if current user is a participant
         if (user) {
@@ -151,21 +164,90 @@ export default function ChallengeDetailsScreen() {
     if (!challenge) return [];
 
     try {
-      const startDate = new Date(challenge.startTime * 1000);
-      const endDate = new Date(challenge.endTime * 1000);
+      const challengeStartTime = new Date(challenge.startTime * 1000);
+      const challengeEndTime = new Date(challenge.endTime * 1000);
       const now = new Date();
 
-      // If challenge hasn't ended yet, use current date as end date
-      const actualEndDate = now < endDate ? now : endDate;
+      // If challenge hasn't ended yet, use current date as end boundary
+      const actualEndDate = now < challengeEndTime ? now : challengeEndTime;
 
-      const stepsData = await fetchStepsForDateRange(startDate, actualEndDate);
+      // Calculate number of days in challenge (up to current date)
+      const startDay = new Date(challengeStartTime);
+      startDay.setHours(0, 0, 0, 0); // Start of the first day
+
+      const endDay = new Date(actualEndDate);
+      endDay.setHours(23, 59, 59, 999); // End of the last day
+
+      // Calculate the difference in days between start and end
+      const dayDiff =
+        Math.floor(
+          (endDay.getTime() - startDay.getTime()) / (1000 * 60 * 60 * 24)
+        ) + 1;
+
+      // Fetch data for each day individually
+      const allStepsData: StepsData[] = [];
+
+      for (let i = 0; i < dayDiff; i++) {
+        const currentDate = new Date(startDay);
+        currentDate.setDate(startDay.getDate() + i);
+
+        const dayStart = new Date(currentDate);
+        dayStart.setHours(0, 0, 0, 0);
+
+        const dayEnd = new Date(currentDate);
+        dayEnd.setHours(23, 59, 59, 999);
+
+        // Don't exceed the actual challenge end time or current time
+        const adjustedDayEnd = new Date(
+          Math.min(dayEnd.getTime(), actualEndDate.getTime())
+        );
+
+        // Don't request data before the challenge start time
+        const adjustedDayStart = new Date(
+          Math.max(dayStart.getTime(), challengeStartTime.getTime())
+        );
+
+        // Only fetch if the day start is before the end time
+        if (adjustedDayStart <= adjustedDayEnd) {
+          const dayData = await fetchStepsForDateRange(
+            adjustedDayStart,
+            adjustedDayEnd
+          );
+
+          if (dayData && Array.isArray(dayData) && dayData.length > 0) {
+            // Update with consistent dateISO for easier matching
+            const updatedDayData = {
+              ...dayData[0],
+              dateISO: dayStart.toISOString().split('T')[0],
+              date: dayStart.toLocaleDateString('en-US'),
+            };
+            allStepsData.push(updatedDayData);
+          } else {
+            // Add empty record for days with no data
+            allStepsData.push({
+              date: dayStart.toLocaleDateString('en-US'),
+              dateISO: dayStart.toISOString().split('T')[0],
+              count: 0,
+              startTime: adjustedDayStart.toISOString(),
+              endTime: adjustedDayEnd.toISOString(),
+              sources: [],
+              recordCount: 0,
+              timestamps: [],
+              records: [],
+            });
+          }
+        }
+      }
 
       // Only set health data if we got valid data back and component is still mounted
-      if (stepsData && Array.isArray(stepsData)) {
-        setHealthData(stepsData);
+      if (allStepsData.length > 0) {
+        setHealthData(allStepsData);
 
         // Calculate total steps and progress
-        const totalSteps = stepsData.reduce((sum, day) => sum + day.count, 0);
+        const totalSteps = allStepsData.reduce(
+          (sum, day) => sum + day.count,
+          0
+        );
         const calculatedProgress = Math.min(
           1,
           totalSteps / challenge.goal.value
@@ -173,7 +255,7 @@ export default function ChallengeDetailsScreen() {
         setPersonalProgress(calculatedProgress);
       }
 
-      return stepsData;
+      return allStepsData;
     } catch (error) {
       console.error('Error fetching health data:', error);
       showErrorToast(error, 'Failed to fetch health data');
@@ -269,6 +351,15 @@ export default function ChallengeDetailsScreen() {
       }
 
       if (!challenge) return;
+
+      // Check if challenge has started
+      if (!challengeHasStarted) {
+        Alert.alert(
+          'Challenge Not Started',
+          'This challenge has not started yet. Please wait until the challenge starts to join.'
+        );
+        return;
+      }
 
       setJoiningChallenge(true);
 
@@ -367,6 +458,7 @@ export default function ChallengeDetailsScreen() {
 
   // Initial data loading
   useEffect(() => {
+    console.log('fetching challenge details');
     fetchChallengeDetails();
   }, [fetchChallengeDetails]);
 
@@ -490,6 +582,8 @@ export default function ChallengeDetailsScreen() {
             <JoinChallengeButton
               onPress={handleJoinChallenge}
               isJoining={joiningChallenge}
+              disabled={!challengeHasStarted}
+              hasStarted={challengeHasStarted}
             />
           )}
 

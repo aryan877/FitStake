@@ -128,6 +128,8 @@ export interface Participant {
   healthData?: {
     date: string;
     steps: number;
+    startTime?: string; // ISO format date-time
+    endTime?: string; // ISO format date-time
     lastUpdated: Date;
   }[];
   progress?: number;
@@ -173,17 +175,4 @@ export interface ChallengeParams {
   searchText?: string;
   visibility?: string;
   challengeId?: string;
-}
-
-interface UserChallengeParams {
-  page?: number;
-  limit?: number;
-  status?: string;
-}
-
-interface LeaderboardParams {
-  page?: number;
-  limit?: number;
-  sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
 }

@@ -1,7 +1,13 @@
 import theme from '@/app/theme';
 import { useHealth } from '@/hooks/useHealth';
 import { Footprints, RefreshCw } from 'lucide-react-native';
-import React, { useEffect, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -15,11 +21,9 @@ import {
 
 const { colors, spacing, borderRadius, fontSize, fontWeight, shadows } = theme;
 
-// Helper function to format date consistently
+// Helper function for date formatting - moved outside component
 const formatDateString = (dateString: string) => {
-  if (!dateString) {
-    return 'Unknown date';
-  }
+  if (!dateString) return 'Unknown date';
 
   try {
     let date;
@@ -73,287 +77,88 @@ const formatDateString = (dateString: string) => {
   }
 };
 
-// Helper function to compare if two dates represent the same day
-const isSameDay = (date1: Date, date2: Date) => {
+// Connection Component - Shown when not connected to health service
+const ConnectionComponent = ({
+  isIOS,
+  setupHealth,
+}: {
+  isIOS: boolean;
+  setupHealth: () => Promise<boolean | void>;
+}) => {
+  const healthServiceName = isIOS ? 'Apple Health' : 'Health Connect';
+
   return (
-    date1.getFullYear() === date2.getFullYear() &&
-    date1.getMonth() === date2.getMonth() &&
-    date1.getDate() === date2.getDate()
+    <View style={styles.stepsCard}>
+      <View style={styles.stepsCardHeader}>
+        <Footprints color={colors.accent.primary} size={24} />
+        <Text style={styles.stepsCardTitle}>Steps Data</Text>
+      </View>
+      <View style={styles.connectionContent}>
+        <View style={styles.connectionAlertContent}>
+          <Text style={styles.connectionAlertTitle}>
+            Connect to {healthServiceName}
+          </Text>
+          <Text style={styles.connectionAlertText}>
+            FitStake needs access to {healthServiceName} to track your steps.{' '}
+            {isIOS
+              ? 'Your fitness apps should be synced with Apple Health separately.'
+              : 'Your fitness apps should be synced with Health Connect separately.'}
+          </Text>
+          <Pressable style={styles.connectionAlertButton} onPress={setupHealth}>
+            <Text style={styles.connectionAlertButtonText}>Connect Now</Text>
+          </Pressable>
+        </View>
+      </View>
+    </View>
   );
 };
 
-// Improved date parsing that handles different formats reliably
-const parseDate = (dateString: string): Date | null => {
-  if (!dateString) return null;
+// Loading Component
+const LoadingComponent = () => (
+  <View style={styles.stepsCard}>
+    <View style={styles.stepsCardHeader}>
+      <Footprints color={colors.accent.primary} size={24} />
+      <Text style={styles.stepsCardTitle}>Steps Data</Text>
+    </View>
+    <ActivityIndicator
+      color={colors.accent.primary}
+      size="large"
+      style={styles.loader}
+    />
+  </View>
+);
 
-  try {
-    let date: Date;
+// Error Component
+const ErrorComponent = ({ errorMessage }: { errorMessage: string | null }) => (
+  <View style={styles.stepsCard}>
+    <View style={styles.stepsCardHeader}>
+      <Footprints color={colors.accent.primary} size={24} />
+      <Text style={styles.stepsCardTitle}>Steps Data</Text>
+    </View>
+    <Text style={styles.stepsCardError}>{errorMessage || 'Unknown error'}</Text>
+  </View>
+);
 
-    // ISO format (YYYY-MM-DD)
-    if (dateString.includes('-') && dateString.length === 10) {
-      const [year, month, day] = dateString.split('-').map(Number);
-      date = new Date(year, month - 1, day);
-    }
-    // MM/DD/YYYY format
-    else if (dateString.includes('/')) {
-      const parts = dateString.split('/');
-      if (parts.length === 3) {
-        const month = parseInt(parts[0], 10) - 1; // Months are 0-indexed in JS Date
-        const day = parseInt(parts[1], 10);
-        const year = parseInt(parts[2], 10);
-        date = new Date(year, month, day);
-      } else {
-        date = new Date(dateString);
-      }
-    }
-    // ISO string with time
-    else if (dateString.includes('T')) {
-      date = new Date(dateString);
-    }
-    // Generic date parsing
-    else {
-      date = new Date(dateString);
-    }
-
-    // Normalize to midnight
-    date.setHours(0, 0, 0, 0);
-
-    // Validate date is valid
-    if (isNaN(date.getTime())) {
-      console.error('Invalid date format:', dateString);
-      return null;
-    }
-
-    return date;
-  } catch (e) {
-    console.error('Error parsing date:', e, dateString);
-    return null;
-  }
-};
-
-const StepsDataCard = () => {
-  const {
-    isAndroid,
-    isIOS,
-    stepsData,
-    loading,
-    error,
-    hasPermissions,
-    refreshStepsData,
-    setupHealth,
-  } = useHealth();
-
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
-  const spinValue = useRef(new Animated.Value(0)).current;
-
-  // Create the rotation animation
-  const startSpinAnimation = () => {
-    spinValue.setValue(0);
-    Animated.loop(
-      Animated.timing(spinValue, {
-        toValue: 1,
-        duration: 1000,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      })
-    ).start();
-  };
-
-  // Stop the animation
-  const stopSpinAnimation = () => {
-    spinValue.stopAnimation();
-  };
-
-  // Create the spinning effect style
-  const spin = spinValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
-
-  // Handle refreshing steps data
-  const handleRefresh = async () => {
-    try {
-      setIsRefreshing(true);
-      startSpinAnimation(); // Start the animation
-      await refreshStepsData();
-      setLastSyncTime(new Date()); // Update last sync time
-    } catch (error) {
-      console.error('Error refreshing steps data:', error);
-    } finally {
-      setIsRefreshing(false);
-      stopSpinAnimation(); // Stop the animation
-    }
-  };
-
-  const ConnectionComponent = () => {
-    const handleConnect = () => {
-      setupHealth();
-    };
-
-    const healthServiceName = isIOS ? 'Apple Health' : 'Health Connect';
-
-    return (
-      <View style={styles.stepsCard}>
-        <View style={styles.stepsCardHeader}>
-          <Footprints color={colors.accent.primary} size={24} />
-          <Text style={styles.stepsCardTitle}>Steps Data</Text>
-        </View>
-        <View style={styles.connectionContent}>
-          <View style={styles.connectionAlertContent}>
-            <Text style={styles.connectionAlertTitle}>
-              Connect to {healthServiceName}
-            </Text>
-            <Text style={styles.connectionAlertText}>
-              FitStake needs access to {healthServiceName} to track your steps.{' '}
-              {isIOS
-                ? 'Your fitness apps should be synced with Apple Health separately.'
-                : 'Your fitness apps should be synced with Health Connect separately.'}
-            </Text>
-            <Pressable
-              style={styles.connectionAlertButton}
-              onPress={handleConnect}
-            >
-              <Text style={styles.connectionAlertButtonText}>Connect Now</Text>
-            </Pressable>
-          </View>
-        </View>
-      </View>
-    );
-  };
-
-  useEffect(() => {
-    const initializeHealth = async () => {
-      await setupHealth();
-      setLastSyncTime(new Date()); // Set initial sync time
-    };
-
-    initializeHealth();
-  }, []);
-
-  // Platform-specific view for unavailable health services
-  if ((isAndroid && !isAndroid) || (isIOS && !isIOS)) {
-    return (
-      <View style={styles.stepsCard}>
-        <View style={styles.stepsCardHeader}>
-          <Footprints color={colors.accent.primary} size={24} />
-          <Text style={styles.stepsCardTitle}>Steps Data</Text>
-        </View>
-        <View style={styles.emptyStateContainer}>
-          <Text style={styles.stepsCardSubtitle}>
-            {isIOS ? 'Apple Health' : 'Health Connect'} Integration
-          </Text>
-          <Text style={styles.stepsCardNote}>
-            Coming soon to {isIOS ? 'iOS' : 'Android'} devices
-          </Text>
-        </View>
-      </View>
-    );
-  }
-
-  // Show connection component if not connected
-  if (!hasPermissions) {
-    return <ConnectionComponent />;
-  }
-
-  // Loading state
-  if (loading && !isRefreshing && !stepsData.length) {
-    return (
-      <View style={styles.stepsCard}>
-        <View style={styles.stepsCardHeader}>
-          <Footprints color={colors.accent.primary} size={24} />
-          <Text style={styles.stepsCardTitle}>Steps Data</Text>
-        </View>
-        <ActivityIndicator
-          color={colors.accent.primary}
-          size="large"
-          style={styles.loader}
-        />
-      </View>
-    );
-  }
-
-  // Error state
-  if (error) {
-    return (
-      <View style={styles.stepsCard}>
-        <View style={styles.stepsCardHeader}>
-          <Footprints color={colors.accent.primary} size={24} />
-          <Text style={styles.stepsCardTitle}>Steps Data</Text>
-        </View>
-        <Text style={styles.stepsCardError}>{error}</Text>
-      </View>
-    );
-  }
-
-  // Process and normalize the steps data
-  const processStepsData = () => {
-    // Create an array of the last 7 days
-    const result = [];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Normalize today to start of day
-
-    // Generate dates for the last 7 days
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() - i);
-      date.setHours(0, 0, 0, 0); // Ensure we're looking at start of day
-
-      // Format date consistently for comparison
-      const formattedDate = date.toLocaleDateString('en-US'); // MM/DD/YYYY
-      const isoDate = date.toISOString().split('T')[0]; // YYYY-MM-DD
-
-      // Find matching data for this date - try both date formats for reliability
-      const matchingData = stepsData.find((item) => {
-        try {
-          // First try to match using the ISO date string if available
-          if (item.dateISO && item.dateISO === isoDate) {
-            return true;
-          }
-
-          // Then try to parse the date from stepsData
-          const itemDate = parseDate(item.date);
-          if (!itemDate) return false;
-
-          // Compare dates (only year, month, day)
-          return isSameDay(itemDate, date);
-        } catch (e) {
-          console.error('Error comparing dates:', e);
-          return false;
-        }
-      });
-
-      result.push({
-        date: formattedDate,
-        displayDate: formatDateString(formattedDate),
-        count: matchingData ? matchingData.count : 0,
-        // Keep necessary properties for backend verification
-        sources: matchingData?.sources || [],
-        recordCount: matchingData?.recordCount || 0,
-        records: matchingData?.records || [],
-      });
-    }
-
-    return result;
-  };
-
-  const processedStepsData = processStepsData();
-
+// Steps Data Component - Main component to show steps data
+const StepsDataContent = ({
+  processedStepsData,
+  formattedSyncTime,
+  handleRefresh,
+  isRefreshing,
+  spin,
+}: {
+  processedStepsData: any[];
+  formattedSyncTime: string;
+  handleRefresh: () => Promise<void>;
+  isRefreshing: boolean;
+  spin: any;
+}) => {
   // Get today's data (first item in processed data)
   const todayData = processedStepsData[0];
 
   // Get recent history (up to 5 days)
   const recentHistory = processedStepsData.slice(0, 5);
 
-  // Format the last sync time
-  const formattedSyncTime = lastSyncTime
-    ? lastSyncTime.toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    : 'Never';
-
-  // Connected with data
   return (
     <View style={styles.stepsCardContainer}>
       {/* Today's Steps Highlight Card */}
@@ -424,6 +229,205 @@ const StepsDataCard = () => {
     </View>
   );
 };
+
+const StepsDataCard = () => {
+  const {
+    isAndroid,
+    isIOS,
+    stepsData,
+    loading,
+    error,
+    hasPermissions,
+    refreshStepsData,
+    setupHealth,
+  } = useHealth();
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
+  const spinValue = useRef(new Animated.Value(0)).current;
+
+  // Add this ref to prevent multiple initialization attempts
+  const initAttempted = useRef(false);
+
+  // Modify the startSpinAnimation function to track the animation reference
+  const startSpinAnimation = useCallback(() => {
+    spinValue.setValue(0);
+    const animation = Animated.loop(
+      Animated.timing(spinValue, {
+        toValue: 1,
+        duration: 1000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+    animation.start();
+    return animation;
+  }, [spinValue]);
+
+  // Handle refreshing steps data - with improved animation handling
+  const handleRefresh = useCallback(async () => {
+    if (isRefreshing) return; // Prevent multiple refreshes
+
+    try {
+      setIsRefreshing(true);
+      const animation = startSpinAnimation(); // Start and track the animation
+
+      await refreshStepsData();
+      setLastSyncTime(new Date()); // Update last sync time
+
+      // Stop animation after data is loaded
+      animation.stop();
+    } catch (error) {
+      console.error('Error refreshing steps data:', error);
+    } finally {
+      setIsRefreshing(false);
+      // Make sure animation stops even if there's an error
+      spinValue.stopAnimation();
+    }
+  }, [isRefreshing, refreshStepsData, startSpinAnimation]);
+
+  // Initialize health service - add cleanup and prevent multiple calls
+  useEffect(() => {
+    let isMounted = true;
+    // Track the animation reference properly
+    let animationRef: Animated.CompositeAnimation | null = null;
+
+    // Only attempt initialization once
+    if (!initAttempted.current) {
+      initAttempted.current = true;
+
+      const initializeHealth = async () => {
+        try {
+          await setupHealth();
+          if (isMounted) {
+            setLastSyncTime(new Date()); // Set initial sync time
+          }
+        } catch (error) {
+          console.error('Failed to initialize health service:', error);
+        }
+      };
+
+      initializeHealth();
+    }
+
+    return () => {
+      isMounted = false;
+      // Stop any ongoing animations when component unmounts
+      spinValue.stopAnimation();
+    };
+  }, [setupHealth]);
+
+  // Process and normalize the steps data - called regardless of render path
+  const processedStepsData = useMemo(() => {
+    // If we don't have data yet, return empty array
+    if (!stepsData || stepsData.length === 0) {
+      return Array(7).fill({
+        count: 0,
+        displayDate: '',
+        sources: [],
+        records: [],
+      });
+    }
+
+    // Create an array of the last 7 days
+    const result = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalize today to start of day
+
+    // Generate dates for the last 7 days
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(today);
+      date.setDate(today.getDate() - i);
+      date.setHours(0, 0, 0, 0); // Ensure we're looking at start of day
+
+      // Format date consistently for comparison
+      const formattedDate = date.toLocaleDateString('en-US'); // MM/DD/YYYY
+      const isoDate = date.toISOString().split('T')[0]; // YYYY-MM-DD
+
+      // Find matching data for this date - prioritize matching by dateISO
+      const matchingData = stepsData.find((item) => {
+        // First try to match using the ISO date string if available (most reliable)
+        if (item.dateISO && item.dateISO === isoDate) {
+          return true;
+        }
+
+        // If no match by ISO, try to match by date string
+        if (item.date && item.date === formattedDate) {
+          return true;
+        }
+
+        // Last resort: Parse and compare dates
+        try {
+          // Only attempt to parse if we have a date value
+          if (!item.date) return false;
+
+          const itemDate = new Date(item.date);
+          if (isNaN(itemDate.getTime())) return false;
+
+          return (
+            itemDate.getFullYear() === date.getFullYear() &&
+            itemDate.getMonth() === date.getMonth() &&
+            itemDate.getDate() === date.getDate()
+          );
+        } catch (e) {
+          return false;
+        }
+      });
+
+      result.push({
+        date: formattedDate,
+        displayDate: formatDateString(formattedDate),
+        count: matchingData ? matchingData.count : 0,
+        sources: matchingData?.sources || [],
+        recordCount: matchingData?.recordCount || 0,
+        records: matchingData?.records || [],
+      });
+    }
+
+    return result;
+  }, [stepsData]);
+
+  // Format the last sync time - called regardless of render path
+  const formattedSyncTime = useMemo(() => {
+    return lastSyncTime
+      ? lastSyncTime.toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      : 'Never';
+  }, [lastSyncTime]);
+
+  // Show connection component if not connected
+  if (!hasPermissions) {
+    return <ConnectionComponent isIOS={isIOS} setupHealth={setupHealth} />;
+  }
+
+  // Loading state
+  if (loading && !isRefreshing && !stepsData.length) {
+    return <LoadingComponent />;
+  }
+
+  // Error state
+  if (error) {
+    return <ErrorComponent errorMessage={error} />;
+  }
+
+  // Connected with data
+  return (
+    <StepsDataContent
+      processedStepsData={processedStepsData}
+      formattedSyncTime={formattedSyncTime}
+      handleRefresh={handleRefresh}
+      isRefreshing={isRefreshing}
+      spin={spinValue.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['0deg', '360deg'],
+      })}
+    />
+  );
+};
+
+export default StepsDataCard;
 
 const styles = StyleSheet.create({
   stepsCardContainer: {
@@ -600,5 +604,3 @@ const styles = StyleSheet.create({
     padding: spacing.xs,
   },
 });
-
-export default StepsDataCard;

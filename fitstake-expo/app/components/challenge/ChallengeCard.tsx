@@ -1,5 +1,5 @@
 import theme from '@/app/theme';
-import { formatCountdown } from '@/app/utils/dateFormatting';
+import { formatTimeDisplay, hasStarted } from '@/app/utils/dateFormatting';
 import { ChallengeData } from '@/types';
 import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 import * as Clipboard from 'expo-clipboard';
@@ -17,7 +17,8 @@ import {
 } from 'react-native';
 import SolanaPriceDisplay from '../SolanaPriceDisplay';
 
-const { colors, spacing, borderRadius, fontSize, fontWeight } = theme;
+const { colors, spacing, borderRadius, fontSize, fontWeight, shadows, cards } =
+  theme;
 
 // Helper function to format SOL amounts
 const formatSolAmount = (lamports: number) => {
@@ -38,7 +39,12 @@ const ChallengeCard = ({
   const router = useRouter();
   // State to hold countdown text
   const [countdownText, setCountdownText] = useState(
-    formatCountdown(challenge.endTime)
+    formatTimeDisplay(challenge.startTime, challenge.endTime)
+  );
+
+  // Check if challenge has started
+  const [hasStartedState, setHasStartedState] = useState(
+    hasStarted(challenge.startTime)
   );
 
   // Calculate if challenge needs more participants
@@ -58,12 +64,19 @@ const ChallengeCard = ({
   // Update countdown every second
   useEffect(() => {
     const intervalId = setInterval(() => {
-      setCountdownText(formatCountdown(challenge.endTime));
+      const newHasStarted = hasStarted(challenge.startTime);
+      // Update has started state in case the challenge starts during viewing
+      if (newHasStarted !== hasStartedState) {
+        setHasStartedState(newHasStarted);
+      }
+      setCountdownText(
+        formatTimeDisplay(challenge.startTime, challenge.endTime)
+      );
     }, 1000);
 
     // Clear interval on component unmount
     return () => clearInterval(intervalId);
-  }, [challenge.endTime]);
+  }, [challenge.startTime, challenge.endTime, hasStartedState]);
 
   // Handle card press
   const handleCardPress = () => {
@@ -85,13 +98,28 @@ const ChallengeCard = ({
     }
   };
 
+  // Handle join button press
+  const handleJoinPress = (e: any) => {
+    e.stopPropagation(); // Prevent the card press event
+    // Only allow joining if challenge has started
+    if (hasStartedState) {
+      onJoin(challenge.id);
+    }
+  };
+
   // Check if challenge is private
   const isPrivate = challenge.isPublic === false;
 
   return (
-    <Pressable style={styles.challengeCard} onPress={handleCardPress}>
-      <View style={styles.challengeCardHeader}>
-        <Text style={styles.challengeCardTitle}>{challenge.title}</Text>
+    <Pressable
+      style={styles.challengeCard}
+      onPress={handleCardPress}
+      android_ripple={{ color: 'transparent' }}
+    >
+      <View style={styles.cardHeader}>
+        <View style={styles.headerLeft}>
+          <Text style={styles.challengeTitle}>{challenge.title}</Text>
+        </View>
         <View style={styles.badgesContainer}>
           {isPrivate && (
             <View style={styles.privateBadge}>
@@ -110,20 +138,51 @@ const ChallengeCard = ({
         </View>
       </View>
 
-      <Text style={styles.challengeCardDesc}>{trimmedDescription}</Text>
+      <View style={styles.contentContainer}>
+        <Text style={styles.challengeDescription}>{trimmedDescription}</Text>
 
-      <View style={styles.challengeCardDetails}>
-        <View style={styles.detailItem}>
-          <Users size={12} color={colors.gray[400]} />
-          <Text style={styles.detailText}>
+        {needsMoreParticipants && (
+          <View style={styles.joinPromptContainer}>
+            <Text style={styles.joinPromptText}>
+              Be one of the first to join! Challenge needs{' '}
+              {challenge.minParticipants} participants.
+            </Text>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.infoContainer}>
+        <View style={styles.infoSection}>
+          <View style={styles.iconLabelGroup}>
+            <Users size={14} color={colors.accent.primary} />
+            <Text style={styles.infoLabel}>Participants</Text>
+          </View>
+          <Text style={styles.infoValue}>
             {challenge.participantCount}/{challenge.maxParticipants}
           </Text>
         </View>
 
-        <View style={styles.detailItem}>
-          <TrendingUp size={12} color={colors.gray[400]} />
+        <View style={styles.divider} />
+
+        <View style={styles.infoSection}>
+          <View style={styles.iconLabelGroup}>
+            <Trophy size={14} color={colors.accent.primary} />
+            <Text style={styles.infoLabel}>Goal</Text>
+          </View>
+          <Text style={styles.infoValue}>
+            {challenge.goal.value.toLocaleString()} {challenge.goal.unit}
+          </Text>
+        </View>
+
+        <View style={styles.divider} />
+
+        <View style={styles.infoSection}>
+          <View style={styles.iconLabelGroup}>
+            <TrendingUp size={14} color={colors.accent.primary} />
+            <Text style={styles.infoLabel}>Stake</Text>
+          </View>
           <View style={styles.stakeContainer}>
-            <Text style={styles.detailText}>
+            <Text style={styles.infoValue}>
               {formatSolAmount(challenge.stakeAmount)} {challenge.token}
             </Text>
             <SolanaPriceDisplay
@@ -134,24 +193,13 @@ const ChallengeCard = ({
             />
           </View>
         </View>
-
-        <View style={styles.detailItem}>
-          <Trophy size={12} color={colors.gray[400]} />
-          <Text style={styles.detailText}>
-            {challenge.goal.value.toLocaleString()} {challenge.goal.unit}
-          </Text>
-        </View>
       </View>
 
-      {needsMoreParticipants && (
-        <Text style={styles.joinPromptText}>
-          Be one of the first to join! Challenge needs{' '}
-          {challenge.minParticipants} participants.
-        </Text>
-      )}
-
-      <View style={styles.challengeCardFooter}>
-        <Text style={styles.challengeCardEndDate}>{countdownText}</Text>
+      <View style={styles.cardFooter}>
+        <View style={styles.timeContainer}>
+          <Text style={styles.timeLabel}>Time Remaining</Text>
+          <Text style={styles.timeValue}>{countdownText}</Text>
+        </View>
 
         <View style={styles.actionButtonsContainer}>
           {isPrivate && (
@@ -171,13 +219,19 @@ const ChallengeCard = ({
             </View>
           ) : (
             <Pressable
-              style={styles.joinButton}
-              onPress={(e) => {
-                e.stopPropagation(); // Prevent the card press event
-                onJoin(challenge.id);
-              }}
+              style={[
+                styles.joinButton,
+                !hasStartedState && styles.joinButtonDisabled,
+              ]}
+              onPress={handleJoinPress}
+              disabled={!hasStartedState}
+              android_ripple={
+                hasStartedState ? { color: colors.accent.primary } : undefined
+              }
             >
-              <Text style={styles.joinButtonText}>Join</Text>
+              <Text style={styles.joinButtonText}>
+                {hasStartedState ? 'Join' : 'Not Started'}
+              </Text>
             </Pressable>
           )}
         </View>
@@ -188,110 +242,30 @@ const ChallengeCard = ({
 
 const styles = StyleSheet.create({
   challengeCard: {
-    backgroundColor: colors.gray[900],
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
+    ...cards.standard,
+    marginBottom: spacing.md,
+    backgroundColor: colors.surface.card,
   },
-  challengeCardHeader: {
+  cardHeader: {
+    ...cards.header,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.sm,
   },
-  challengeCardTitle: {
+  headerLeft: {
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  challengeTitle: {
     fontSize: fontSize.lg,
     fontWeight: fontWeight.bold,
     color: colors.white,
-    flex: 1,
+    lineHeight: 24,
   },
-  challengeCardDesc: {
-    fontSize: fontSize.sm,
-    color: colors.gray[300],
-    marginBottom: spacing.md,
-  },
-  challengeCardDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: spacing.md,
-    backgroundColor: colors.gray[800],
-    borderRadius: borderRadius.md,
-    padding: spacing.sm,
-  },
-  detailItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  stakeContainer: {
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-  },
-  detailText: {
-    color: colors.gray[300],
-    fontSize: fontSize.xs,
-  },
-  challengeCardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  challengeCardEndDate: {
-    fontSize: fontSize.sm,
-    color: colors.accent.primary,
-    fontWeight: fontWeight.medium,
-  },
-  actionButtonsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  joinButton: {
-    backgroundColor: colors.accent.primary,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.md,
-    minWidth: 60,
-    alignItems: 'center',
-  },
-  joinButtonText: {
-    color: colors.white,
-    fontSize: fontSize.sm,
-    fontWeight: fontWeight.medium,
-  },
-  copyButton: {
-    backgroundColor: colors.gray[700],
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  copyButtonText: {
-    color: colors.white,
-    fontSize: fontSize.xs,
-    fontWeight: fontWeight.medium,
-  },
-  needsParticipantsBadge: {
-    backgroundColor: colors.accent.secondary,
-    paddingVertical: 2,
-    paddingHorizontal: spacing.xs,
-    borderRadius: borderRadius.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  needsParticipantsText: {
-    color: colors.white,
-    fontSize: 10,
-    fontWeight: fontWeight.medium,
-  },
-  joinPromptText: {
-    color: colors.accent.secondary,
-    fontSize: fontSize.xs,
-    marginTop: spacing.xs,
-    marginBottom: spacing.sm,
-    fontStyle: 'italic',
+  contentContainer: {
+    padding: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
   },
   badgesContainer: {
     flexDirection: 'row',
@@ -300,14 +274,145 @@ const styles = StyleSheet.create({
   },
   privateBadge: {
     backgroundColor: colors.gray[700],
-    paddingVertical: 2,
+    paddingVertical: 4,
     paddingHorizontal: spacing.xs,
     borderRadius: borderRadius.sm,
-    borderWidth: 1,
-    borderColor: colors.gray[600],
   },
   privateBadgeText: {
     color: colors.gray[300],
+    fontSize: 10,
+    fontWeight: fontWeight.medium,
+  },
+  challengeDescription: {
+    fontSize: fontSize.sm,
+    color: colors.gray[300],
+    lineHeight: 20,
+  },
+  infoContainer: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(0,0,0,0.15)',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.04)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.04)',
+  },
+  infoSection: {
+    flex: 1,
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  iconLabelGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+    gap: 4,
+  },
+  infoLabel: {
+    fontSize: fontSize.xs,
+    color: colors.gray[400],
+    fontWeight: fontWeight.medium,
+  },
+  infoValue: {
+    fontSize: fontSize.sm,
+    color: colors.white,
+    fontWeight: fontWeight.bold,
+    textAlign: 'center',
+  },
+  divider: {
+    width: 1,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    height: '70%',
+    marginHorizontal: spacing.xs,
+  },
+  stakeContainer: {
+    alignItems: 'center',
+  },
+  joinPromptContainer: {
+    backgroundColor: 'rgba(0, 221, 95, 0.08)',
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+    marginTop: spacing.md,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.accent.secondary,
+  },
+  joinPromptText: {
+    color: colors.accent.secondary,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.medium,
+  },
+  cardFooter: {
+    ...cards.footer,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  timeContainer: {
+    flexDirection: 'column',
+  },
+  timeLabel: {
+    fontSize: fontSize.xs,
+    color: colors.gray[400],
+    marginBottom: 2,
+  },
+  timeValue: {
+    fontSize: fontSize.sm,
+    color: colors.accent.primary,
+    fontWeight: fontWeight.bold,
+  },
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  joinButton: {
+    backgroundColor: colors.accent.primary,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    minWidth: 80,
+    alignItems: 'center',
+    height: 32,
+    justifyContent: 'center',
+  },
+  joinButtonDisabled: {
+    backgroundColor: colors.gray[700],
+    opacity: 0.7,
+  },
+  joinButtonText: {
+    color: colors.white,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium,
+  },
+  copyButton: {
+    backgroundColor: 'rgba(64, 64, 64, 0.7)',
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    height: 32,
+  },
+  copyButtonText: {
+    color: colors.white,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.medium,
+  },
+  needsParticipantsBadge: {
+    backgroundColor: colors.accent.secondary,
+    paddingVertical: 4,
+    paddingHorizontal: spacing.xs,
+    borderRadius: borderRadius.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  needsParticipantsText: {
+    color: colors.white,
     fontSize: 10,
     fontWeight: fontWeight.medium,
   },

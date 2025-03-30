@@ -41,6 +41,9 @@ const ChallengeOverview = ({
   onCopyId,
   challengeId,
 }: ChallengeOverviewProps) => {
+  // Determine if this is a "Starts in" countdown
+  const isStartingCountdown = timeRemaining.startsWith('Starts in');
+
   return (
     <View style={styles.container}>
       <View style={styles.cardHeader}>
@@ -138,9 +141,14 @@ const ChallengeOverview = ({
         </View>
 
         <View style={styles.timerContainer}>
-          <Text style={styles.timerLabel}>Remaining:</Text>
+          <Text style={styles.timerLabel}>
+            {isStartingCountdown ? 'Starting:' : 'Remaining:'}
+          </Text>
           <Text
-            style={styles.timerValue}
+            style={[
+              styles.timerValue,
+              isStartingCountdown && styles.startsInTimerValue,
+            ]}
             numberOfLines={1}
             adjustsFontSizeToFit
             minimumFontScale={0.7}
@@ -302,6 +310,9 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     color: colors.accent.primary,
     fontWeight: fontWeight.medium,
+  },
+  startsInTimerValue: {
+    color: colors.accent.secondary,
   },
   dateDivider: {
     width: 1,

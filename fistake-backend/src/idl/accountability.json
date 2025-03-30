@@ -296,26 +296,31 @@
     },
     {
       "code": 6004,
+      "name": "ChallengeNotStarted",
+      "msg": "Challenge has not started yet"
+    },
+    {
+      "code": 6005,
       "name": "ChallengeNotCompleted",
       "msg": "Challenge is not completed"
     },
     {
-      "code": 6005,
+      "code": 6006,
       "name": "AlreadyCompleted",
       "msg": "Participant has already completed the challenge"
     },
     {
-      "code": 6006,
+      "code": 6007,
       "name": "NotCompleted",
       "msg": "Participant has not completed the challenge"
     },
     {
-      "code": 6007,
+      "code": 6008,
       "name": "AlreadyClaimed",
       "msg": "Rewards already claimed"
     },
     {
-      "code": 6008,
+      "code": 6009,
       "name": "UnauthorizedAdmin",
       "msg": "Unauthorized admin"
     }

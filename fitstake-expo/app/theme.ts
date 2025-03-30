@@ -25,20 +25,27 @@ export const colors = {
 
   // Accent colors
   accent: {
-    primary: '#FF4C00', // Vibrant orange (slightly more saturated)
-    secondary: '#00DD5F', // Brighter green for better visibility
+    primary: '#FF4C00', // Vibrant orange
+    secondary: '#00DD5F', // Bright green
     warning: '#FFD600', // Warning yellow
-    error: '#FF3B30', // Brighter error red for better visibility
-    info: '#0A84FF', // New info blue color
-    success: '#34C759', // New success color
-    purple: '#AF52DE', // New accent purple
+    error: '#FF3B30', // Error red
+    info: '#0A84FF', // Info blue
+    success: '#34C759', // Success color
+    purple: '#AF52DE', // Accent purple
   },
 
-  // Gradient presets
-  gradients: {
-    primary: ['#FF4C00', '#FF7800'], // Orange gradient
-    secondary: ['#00DD5F', '#00AA44'], // Green gradient
-    dark: ['#262626', '#000000'], // Dark gradient
+  // Status colors with alpha values
+  status: {
+    active: 'rgba(255, 76, 0, 0.12)',
+    completed: 'rgba(52, 199, 89, 0.12)',
+    failed: 'rgba(255, 59, 48, 0.12)',
+  },
+
+  // Surface colors
+  surface: {
+    card: '#1A1A1A',
+    input: '#262626',
+    overlay: 'rgba(0, 0, 0, 0.7)',
   },
 };
 
@@ -52,10 +59,12 @@ export const spacing = {
 };
 
 export const borderRadius = {
+  xs: 2,
   sm: 4,
   md: 8,
   lg: 12,
   xl: 16,
+  xxl: 24,
   full: 9999,
 };
 
@@ -77,26 +86,66 @@ export const fontWeight = {
 };
 
 export const shadows = {
+  none: {
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
+  },
   sm: {
-    shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
+    shadowColor: 'rgba(0, 0, 0, 0.8)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
     elevation: 2,
   },
   md: {
-    shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowColor: 'rgba(0, 0, 0, 0.8)',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 5,
+    elevation: 3,
   },
   lg: {
-    shadowColor: colors.black,
+    shadowColor: 'rgba(0, 0, 0, 0.8)',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 8,
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+};
+
+// Card-specific styling defaults
+export const cards = {
+  standard: {
+    backgroundColor: colors.surface.card,
+    borderRadius: borderRadius.lg,
+    padding: 0,
+    ...shadows.md,
+  },
+  interactive: {
+    backgroundColor: colors.surface.card,
+    borderRadius: borderRadius.lg,
+    padding: 0,
+    ...shadows.md,
+    activeOpacity: 0.9,
+  },
+  header: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.04)',
+  },
+  section: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  footer: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.04)',
   },
 };
 
@@ -107,4 +156,5 @@ export default {
   fontSize,
   fontWeight,
   shadows,
+  cards,
 };

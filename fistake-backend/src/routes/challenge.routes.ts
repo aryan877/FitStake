@@ -11,8 +11,8 @@ import { authenticatePrivyToken } from "../middleware/auth.middleware";
 const router = express.Router();
 
 // Public routes
-router.get("/", getChallenges);
-router.get("/:id", getChallengeById);
+router.get("/", authenticatePrivyToken, getChallenges);
+router.get("/:id", authenticatePrivyToken, getChallengeById);
 
 // Protected routes
 router.get("/user/challenges", authenticatePrivyToken, getUserChallenges);
