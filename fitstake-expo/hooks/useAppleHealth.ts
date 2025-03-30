@@ -260,7 +260,7 @@ export const useAppleHealth = () => {
           date: startDate.toISOString(), // For single day total
           startDate: startDate.toISOString(), // For samples
           endDate: endDate.toISOString(),
-          includeManuallyAdded: true,
+          includeManuallyAdded: false,
         };
 
         // Get total steps for this specific day
