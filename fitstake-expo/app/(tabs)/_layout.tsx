@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Activity, Trophy, User, Wallet } from 'lucide-react-native';
+import { Activity, Award, Trophy, User, Wallet } from 'lucide-react-native';
 import React from 'react';
 import { StyleSheet } from 'react-native';
 import { TabBarIconProps } from '../../types';
@@ -33,6 +33,15 @@ export default function TabLayout() {
           title: 'My Challenges',
           tabBarIcon: ({ color, size }: TabBarIconProps) => (
             <Activity size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="leaderboard"
+        options={{
+          title: 'Leaderboard',
+          tabBarIcon: ({ color, size }: TabBarIconProps) => (
+            <Award size={size} color={color} />
           ),
         }}
       />

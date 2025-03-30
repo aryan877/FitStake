@@ -25,10 +25,20 @@ export const colors = {
 
   // Accent colors
   accent: {
-    primary: '#FF3D00', // Vibrant orange
-    secondary: '#00C853', // Success green
+    primary: '#FF4C00', // Vibrant orange (slightly more saturated)
+    secondary: '#00DD5F', // Brighter green for better visibility
     warning: '#FFD600', // Warning yellow
-    error: '#D50000', // Error red
+    error: '#FF3B30', // Brighter error red for better visibility
+    info: '#0A84FF', // New info blue color
+    success: '#34C759', // New success color
+    purple: '#AF52DE', // New accent purple
+  },
+
+  // Gradient presets
+  gradients: {
+    primary: ['#FF4C00', '#FF7800'], // Orange gradient
+    secondary: ['#00DD5F', '#00AA44'], // Green gradient
+    dark: ['#262626', '#000000'], // Dark gradient
   },
 };
 

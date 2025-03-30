@@ -23,3 +23,16 @@ export interface UserBadge {
   badgeId: string;
   earnedAt: Date;
 }
+
+export interface UserChallengeParams {
+  page?: number;
+  limit?: number;
+  status?: string;
+}
+
+interface LeaderboardParams {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}

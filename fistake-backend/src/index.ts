@@ -10,6 +10,7 @@ import adminRoutes from "./routes/admin.routes";
 import authRoutes from "./routes/auth.routes";
 import challengeRoutes from "./routes/challenge.routes";
 import healthRoutes from "./routes/health.routes";
+import leaderboardRoutes from "./routes/leaderboard.routes";
 import badgeService from "./services/badge.service";
 import cronService from "./services/cron.service";
 
@@ -34,6 +35,7 @@ app.use("/api/challenges", challengeRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/health", healthRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/leaderboard", leaderboardRoutes);
 
 // Health check route
 app.get("/health", (req, res) => {

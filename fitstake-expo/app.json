@@ -8,6 +8,10 @@
     "scheme": "fitstake",
     "newArchEnabled": false,
     "assetBundlePatterns": ["**/*"],
+    "splash": {
+      "backgroundColor": "#000000",
+      "resizeMode": "contain"
+    },
     "web": {
       "bundler": "metro"
     },

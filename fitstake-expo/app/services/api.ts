@@ -1,6 +1,8 @@
+import { LeaderboardParams } from '@/types/leaderboard';
+import { UserChallengeParams } from '@/types/user';
 import { getAccessToken } from '@privy-io/expo';
 import axios from 'axios';
-import { StepsData } from '../../types';
+import { ChallengeParams, StepsData } from '../../types';
 
 // API configuration
 const BACKEND_URL =
@@ -32,30 +34,6 @@ const handleApiError = (error: any, context: string) => {
   console.error(`API Error - ${context}:`, error);
   throw new Error(error.response?.data?.message || error.message);
 };
-
-interface ChallengeParams {
-  page?: number;
-  limit?: number;
-  type?: string;
-  status?: string;
-  minStake?: number;
-  maxStake?: number;
-  minGoal?: number;
-  maxGoal?: number;
-  minParticipants?: number;
-  maxParticipants?: number;
-  sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
-  searchText?: string;
-  visibility?: string;
-  challengeId?: string;
-}
-
-interface UserChallengeParams {
-  page?: number;
-  limit?: number;
-  status?: string;
-}
 
 // Auth endpoints
 export const authApi = {
@@ -111,6 +89,25 @@ export const adminApi = {
     } catch (error) {
       console.error('Error checking admin status:', error);
       return { success: false, data: { isAdmin: false } };
+    }
+  },
+};
+
+// Leaderboard endpoints
+export const leaderboardApi = {
+  getAllTime: async (params: LeaderboardParams = {}) => {
+    try {
+      const response = await api.get('/leaderboard/all-time', { params });
+
+      if (!response.data?.success) {
+        throw new Error(
+          response.data?.message || 'Failed to fetch leaderboard'
+        );
+      }
+
+      return response.data;
+    } catch (error) {
+      return handleApiError(error, 'getAllTime leaderboard');
     }
   },
 };

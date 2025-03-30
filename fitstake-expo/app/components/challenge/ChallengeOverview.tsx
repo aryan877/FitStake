@@ -1,5 +1,5 @@
 import theme from '@/app/theme';
-import { CalendarDays, Copy, Globe, Lock } from 'lucide-react-native';
+import { CalendarDays, Copy, Globe, Lock, Share2 } from 'lucide-react-native';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import SolanaPriceDisplay from '../SolanaPriceDisplay';
@@ -21,6 +21,7 @@ interface ChallengeOverviewProps {
   timeRemaining: string;
   isPublic: boolean;
   onCopyId?: () => void;
+  challengeId?: string;
 }
 
 const ChallengeOverview = ({
@@ -38,6 +39,7 @@ const ChallengeOverview = ({
   timeRemaining,
   isPublic,
   onCopyId,
+  challengeId,
 }: ChallengeOverviewProps) => {
   return (
     <View style={styles.container}>
@@ -45,12 +47,6 @@ const ChallengeOverview = ({
         <Text style={styles.cardTitle} numberOfLines={1}>
           Overview
         </Text>
-        {!isPublic && onCopyId && (
-          <Pressable style={styles.copyIdButton} onPress={onCopyId} hitSlop={8}>
-            <Copy size={14} color={colors.white} />
-            <Text style={styles.copyIdText}>Copy ID</Text>
-          </Pressable>
-        )}
       </View>
 
       <View style={styles.detailsGrid}>
@@ -154,30 +150,45 @@ const ChallengeOverview = ({
         </View>
       </View>
 
-      <View style={styles.visibilitySection}>
-        {isPublic ? (
-          <>
+      {isPublic ? (
+        <View style={styles.visibilitySection}>
+          <View style={styles.visibilityHeader}>
             <Globe size={16} color={colors.accent.primary} />
             <Text style={styles.visibilityText} numberOfLines={1}>
               Public Challenge
             </Text>
-          </>
-        ) : (
-          <View style={styles.privateSection}>
-            <View style={styles.privateHeader}>
-              <Lock size={16} color={colors.accent.secondary} />
-              <Text style={styles.visibilityText} numberOfLines={1}>
-                Private Challenge
-              </Text>
-            </View>
-            {onCopyId && (
-              <Text style={styles.visibilityHint} numberOfLines={2}>
-                Share the challenge ID with friends to let them join
-              </Text>
-            )}
           </View>
-        )}
-      </View>
+        </View>
+      ) : (
+        <View style={styles.privateSection}>
+          <View style={styles.privateHeader}>
+            <Lock size={16} color={colors.accent.secondary} />
+            <Text style={styles.visibilityText} numberOfLines={1}>
+              Private Challenge
+            </Text>
+          </View>
+
+          {onCopyId && challengeId && (
+            <View style={styles.shareSection}>
+              <View style={styles.shareHintContainer}>
+                <Share2 size={14} color={colors.gray[300]} />
+                <Text style={styles.shareHintText}>
+                  Share this ID with friends to invite them
+                </Text>
+              </View>
+
+              <Pressable style={styles.idContainer} onPress={onCopyId}>
+                <Text style={styles.idValue} numberOfLines={1}>
+                  {challengeId}
+                </Text>
+                <View style={styles.copyButton}>
+                  <Copy size={14} color={colors.white} />
+                </View>
+              </Pressable>
+            </View>
+          )}
+        </View>
+      )}
     </View>
   );
 };
@@ -204,20 +215,6 @@ const styles = StyleSheet.create({
     color: colors.white,
     flex: 1,
     marginRight: spacing.sm,
-  },
-  copyIdButton: {
-    padding: spacing.xs,
-    backgroundColor: colors.accent.primary,
-    borderRadius: borderRadius.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexDirection: 'row',
-  },
-  copyIdText: {
-    color: colors.white,
-    fontSize: fontSize.xs,
-    marginLeft: spacing.xs,
-    fontWeight: fontWeight.medium,
   },
   detailsGrid: {
     flexDirection: 'row',
@@ -306,10 +303,6 @@ const styles = StyleSheet.create({
     color: colors.accent.primary,
     fontWeight: fontWeight.medium,
   },
-  timeRemaining: {
-    color: colors.accent.primary,
-    fontWeight: fontWeight.medium,
-  },
   dateDivider: {
     width: 1,
     height: 36,
@@ -318,31 +311,74 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   visibilitySection: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
     backgroundColor: colors.gray[800],
-    padding: spacing.md,
     borderRadius: borderRadius.md,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.accent.primary,
   },
   privateSection: {
-    width: '100%',
+    backgroundColor: colors.gray[800],
+    borderRadius: borderRadius.md,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.accent.secondary,
+    overflow: 'hidden',
   },
   privateHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    padding: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray[700],
+  },
+  visibilityHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
   },
   visibilityText: {
     color: colors.white,
     fontSize: fontSize.sm,
-    fontWeight: fontWeight.medium,
+    fontWeight: fontWeight.semibold,
     marginLeft: spacing.xs,
     flex: 1,
   },
-  visibilityHint: {
-    color: colors.gray[400],
+  shareSection: {
+    backgroundColor: colors.gray[900],
+    borderRadius: borderRadius.md,
+    margin: spacing.sm,
+    marginTop: spacing.md,
+    overflow: 'hidden',
+    ...shadows.sm,
+  },
+  shareHintContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray[800],
+  },
+  shareHintText: {
+    color: colors.gray[300],
     fontSize: fontSize.xs,
-    marginTop: spacing.xs,
-    marginLeft: spacing.md,
+    marginLeft: spacing.xs,
+  },
+  idContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: spacing.md,
+  },
+  idValue: {
+    color: colors.white,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium,
+    flex: 1,
+  },
+  copyButton: {
+    backgroundColor: colors.accent.secondary,
+    padding: spacing.xs,
+    borderRadius: borderRadius.full,
   },
   usdEquivalent: {
     marginTop: 2,

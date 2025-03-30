@@ -528,6 +528,7 @@ export default function ChallengeDetailsScreen() {
             timeRemaining={currentTimeRemaining}
             isPublic={challenge.isPublic}
             onCopyId={handleCopyId}
+            challengeId={challenge.challengeId}
           />
 
           {/* Description Card */}

@@ -8,6 +8,7 @@ import { Alert, Platform, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFrameworkReady } from '../hooks/useFrameworkReady';
 import OnboardingModal from './components/OnboardingModal';
+import SplashScreen from './components/SplashScreen';
 import ToastContainer from './components/Toast';
 import { authApi } from './services/api';
 import theme from './theme';
@@ -137,6 +138,7 @@ export default function RootLayout() {
   const [privyInitError, setPrivyInitError] = React.useState<Error | null>(
     null
   );
+  const [isSplashVisible, setIsSplashVisible] = React.useState(true);
 
   React.useEffect(() => {
     // Log environment info
@@ -170,16 +172,12 @@ export default function RootLayout() {
   // Only show loading for framework initialization
   if (!isFrameworkReady) {
     return (
-      <View
-        style={{
-          flex: 1,
-          justifyContent: 'center',
-          alignItems: 'center',
-          backgroundColor: colors.black,
+      <SplashScreen
+        onFinish={() => {
+          // In a real implementation, we'd wait for framework ready
+          // But here we want to show the splash screen regardless
         }}
-      >
-        <Text style={{ color: colors.white }}>Initializing framework...</Text>
-      </View>
+      />
     );
   }
 
@@ -222,6 +220,11 @@ export default function RootLayout() {
   }
 
   try {
+    // If splash is still visible, show it before the main app
+    if (isSplashVisible) {
+      return <SplashScreen onFinish={() => setIsSplashVisible(false)} />;
+    }
+
     return (
       <SafeAreaProvider>
         <PrivyProvider appId={PRIVY_APP_ID} clientId={PRIVY_CLIENT_ID}>

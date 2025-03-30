@@ -156,3 +156,34 @@ export interface ChallengeDetails {
   isCompleted: boolean;
   isPublic: boolean;
 }
+
+export interface ChallengeParams {
+  page?: number;
+  limit?: number;
+  type?: string;
+  status?: string;
+  minStake?: number;
+  maxStake?: number;
+  minGoal?: number;
+  maxGoal?: number;
+  minParticipants?: number;
+  maxParticipants?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  searchText?: string;
+  visibility?: string;
+  challengeId?: string;
+}
+
+interface UserChallengeParams {
+  page?: number;
+  limit?: number;
+  status?: string;
+}
+
+interface LeaderboardParams {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}

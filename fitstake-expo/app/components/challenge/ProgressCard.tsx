@@ -59,28 +59,30 @@ export const ProgressCard = ({
     }
   };
 
+  const getProgressColor = () => {
+    if (progressPercentage >= 100) return colors.accent.primary;
+    if (progressPercentage >= 50) return colors.accent.secondary;
+    return colors.accent.secondary;
+  };
+
   return (
     <View style={styles.container}>
-      <View style={styles.progressBarRow}>
-        <View style={styles.progressLabel}>
-          <Text style={styles.progressTitle}>Your Progress</Text>
-          <Text style={styles.progressPercentage}>{progressPercentage}%</Text>
-        </View>
-        <View style={styles.progressBarContainer}>
-          <View style={styles.progressBar}>
-            <View
-              style={[
-                styles.progressFill,
-                {
-                  width: `${progressPercentage}%`,
-                  backgroundColor:
-                    progressPercentage >= 100
-                      ? colors.accent.primary
-                      : colors.accent.secondary,
-                },
-              ]}
-            />
-          </View>
+      <View style={styles.headerRow}>
+        <Text style={styles.progressTitle}>Your Progress</Text>
+        <Text style={styles.progressPercentage}>{progressPercentage}%</Text>
+      </View>
+
+      <View style={styles.progressBarContainer}>
+        <View style={styles.progressBar}>
+          <View
+            style={[
+              styles.progressFill,
+              {
+                width: `${progressPercentage}%`,
+                backgroundColor: getProgressColor(),
+              },
+            ]}
+          />
         </View>
       </View>
 
@@ -121,12 +123,11 @@ export const ProgressCard = ({
         <View style={styles.warningContainer}>
           <AlertCircle
             size={16}
-            color={colors.accent.warning}
+            color={colors.accent.error}
             style={styles.warningIcon}
           />
           <Text style={styles.warningText}>
-            Remember to sync your steps before the challenge ends or you'll
-            lose!
+            Sync your steps before the challenge ends or you'll lose your stake!
           </Text>
         </View>
       )}
@@ -191,27 +192,19 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     ...shadows.md,
   },
-  progressBarRow: {
+  headerRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: spacing.md,
-  },
-  progressLabel: {
-    width: 110,
   },
   progressTitle: {
     fontSize: fontSize.md,
     fontWeight: fontWeight.semibold,
     color: colors.white,
-    marginBottom: spacing.xs,
-  },
-  progressPercentage: {
-    fontSize: fontSize.md,
-    fontWeight: fontWeight.bold,
-    color: colors.accent.primary,
   },
   progressBarContainer: {
-    flex: 1,
+    marginBottom: spacing.md,
   },
   progressBar: {
     height: 8,
@@ -223,9 +216,17 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: borderRadius.full,
   },
+  progressPercentage: {
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.bold,
+    color: colors.accent.primary,
+  },
   progressStats: {
     flexDirection: 'row',
     alignItems: 'center',
+    padding: spacing.md,
+    backgroundColor: colors.gray[800],
+    borderRadius: borderRadius.md,
     marginBottom: spacing.md,
   },
   progressStat: {
@@ -255,21 +256,21 @@ const styles = StyleSheet.create({
   },
   warningContainer: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     backgroundColor: colors.gray[800],
-    padding: spacing.sm,
+    padding: spacing.md,
     borderRadius: borderRadius.md,
     marginBottom: spacing.md,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.accent.error,
   },
   warningIcon: {
-    marginTop: 2,
+    marginRight: spacing.sm,
   },
   warningText: {
-    color: colors.accent.warning,
+    color: colors.gray[300],
     fontSize: fontSize.xs,
     flex: 1,
-    marginLeft: spacing.xs,
-    flexWrap: 'wrap',
   },
   actionButton: {
     backgroundColor: colors.accent.secondary,
@@ -301,7 +302,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.md,
     alignItems: 'center',
-    marginTop: spacing.sm,
   },
   claimButtonText: {
     color: colors.white,
@@ -313,7 +313,6 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
     borderRadius: borderRadius.md,
     alignItems: 'center',
-    marginTop: spacing.sm,
   },
   failedText: {
     color: colors.accent.error,
