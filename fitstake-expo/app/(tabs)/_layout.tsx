@@ -21,7 +21,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Challenges',
+          title: 'Home',
           tabBarIcon: ({ color, size }: TabBarIconProps) => (
             <Trophy size={size} color={color} />
           ),
@@ -30,7 +30,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="challenges"
         options={{
-          title: 'My Challenges',
+          title: 'Mine',
           tabBarIcon: ({ color, size }: TabBarIconProps) => (
             <Activity size={size} color={color} />
           ),
@@ -39,7 +39,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="leaderboard"
         options={{
-          title: 'Leaderboard',
+          title: 'Rank',
           tabBarIcon: ({ color, size }: TabBarIconProps) => (
             <Award size={size} color={color} />
           ),
@@ -57,7 +57,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
+          title: 'Me',
           tabBarIcon: ({ color, size }: TabBarIconProps) => (
             <User size={size} color={color} />
           ),
