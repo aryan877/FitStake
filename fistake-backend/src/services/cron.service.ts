@@ -81,6 +81,41 @@ const processEndedChallenges = async () => {
     if (challenges.length === 0) return;
 
     for (const challenge of challenges) {
+      // Handle case where minimum participants threshold wasn't met
+      if (
+        !challenge.isActive &&
+        challenge.participantCount < challenge.minParticipants
+      ) {
+        console.log(
+          `Challenge ${challenge.challengeId} didn't reach minimum participants threshold (${challenge.participantCount}/${challenge.minParticipants}). Refunding participants.`
+        );
+
+        // Process refunds for each participant
+        for (const participant of challenge.participants) {
+          // Skip if already completed or claimed
+          if (participant.completed || participant.claimed) continue;
+
+          try {
+            // Set completed and claimed to true to prevent double processing
+            participant.completed = true;
+            participant.claimed = true;
+          } catch (error) {
+            console.error(
+              `Error processing refund for participant ${participant.walletAddress}:`,
+              error
+            );
+          }
+        }
+
+        // Mark challenge as completed to prevent reprocessing
+        challenge.isCompleted = true;
+        await challenge.save();
+
+        // Handle on-chain refund logic (separate function below)
+        await refundInactiveChallenge(challenge);
+        continue;
+      }
+
       const { goal } = challenge;
       const completedWallets: string[] = [];
 
@@ -264,6 +299,81 @@ const submitCompletedWalletsToContract = async (
     }
   } catch (error) {
     console.error("Error submitting to contract:", error);
+    return false;
+  }
+};
+
+/**
+ * Process refunds for a challenge that didn't meet minimum participants
+ */
+const refundInactiveChallenge = async (challenge: any): Promise<boolean> => {
+  try {
+    if (!idl || !PROGRAM_ID) {
+      console.error("IDL or Program ID not available");
+      return false;
+    }
+
+    // Initialize Anchor program
+    const provider = new anchor.AnchorProvider(
+      connection,
+      new anchor.Wallet(adminKeypair),
+      { commitment: "confirmed" }
+    );
+
+    const program = new anchor.Program(idl, PROGRAM_ID, provider);
+
+    // Get challenge PDA
+    const challengePDA = new PublicKey(challenge.solanaChallengePda);
+    const vaultPDA = new PublicKey(challenge.solanaVaultPda);
+
+    try {
+      // First, mark the challenge as completed on-chain
+      const finalizeTx = await program.methods
+        .finalizeChallenge()
+        .accounts({
+          challenge: challengePDA,
+          admin: adminKeypair.publicKey,
+        })
+        .signers([adminKeypair])
+        .rpc();
+
+      await connection.confirmTransaction(finalizeTx, "confirmed");
+
+      // For each participant, create a "completed list" containing all participants
+      // This ensures everyone gets their stake back when the challenge doesn't reach min participants
+      const allParticipantWallets = challenge.participants.map(
+        (p: any) => new PublicKey(p.walletAddress)
+      );
+
+      // Get completedList PDA
+      const [completedListPDA] = findCompletedListPDA(challengePDA);
+
+      // Submit all participants as "completed" to allow them to claim their stake back
+      const adminCompleteTx = await program.methods
+        .adminCompleteChallenges(allParticipantWallets)
+        .accounts({
+          challenge: challengePDA,
+          completedList: completedListPDA,
+          admin: adminKeypair.publicKey,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .signers([adminKeypair])
+        .rpc();
+
+      // Wait for confirmation
+      await connection.confirmTransaction(adminCompleteTx, "confirmed");
+
+      // Update verification status
+      challenge.onChainVerificationComplete = true;
+      await challenge.save();
+
+      return true;
+    } catch (error) {
+      console.error("Error refunding inactive challenge:", error);
+      return false;
+    }
+  } catch (error) {
+    console.error("Error with refund process:", error);
     return false;
   }
 };
