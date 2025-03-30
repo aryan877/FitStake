@@ -60,6 +60,13 @@ The mobile app allows users to:
 - Stake SOL on challenges
 - Monitor progress and claim rewards
 
+### Health Data Connectivity
+
+For the app to track fitness activity:
+
+- **iOS users**: The app connects directly with Apple HealthKit
+- **Android users**: You need to sync your fitness app (Google Fit, Fitbit, Samsung Health, etc.) with Health Connect first. Open the Health Connect app, grant FitStake permissions, and ensure your preferred fitness app is syncing data to Health Connect.
+
 ### Privy Configuration
 
 Both the mobile app and backend require Privy API keys for authentication:
