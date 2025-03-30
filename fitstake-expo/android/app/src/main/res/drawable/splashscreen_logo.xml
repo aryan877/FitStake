@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="100dp"
+    android:height="100dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+    
+    <!-- Create a simple text-based logo using shapes -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M20,40 L20,60 L40,60 L40,40 L20,40 Z" />
+    <path
+        android:fillColor="#6366F1"
+        android:pathData="M45,40 L45,60 L80,60 L80,40 L45,40 Z" />
+</vector> 
