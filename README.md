@@ -1,4 +1,4 @@
-# FitStake - Get Fit, Stake SOL, Earn Rewards! 💪💰
+# FitStake - Get Fit, Stake SOL, Earn Rewards
 
 <img src="./fitstake.gif" alt="FitStake Demo" width="250"/>
 
@@ -6,79 +6,151 @@
 [![Solana](https://img.shields.io/badge/Solana-devnet-green.svg)](https://solana.com/)
 [![Node.js](https://img.shields.io/badge/Node.js-v18+-yellow.svg)](https://nodejs.org/)
 
-## Turn Your Fitness Journey into Financial Rewards!
+## Overview
 
-FitStake revolutionizes fitness motivation by combining exercise with cryptocurrency rewards. Stake SOL tokens on fitness challenges, complete your goals, and earn rewards - all secured by blockchain technology!
+FitStake revolutionizes fitness motivation by combining exercise with cryptocurrency rewards. Users stake SOL tokens on fitness challenges, complete their goals, and earn rewards - all secured by blockchain technology.
 
-## 📱 Project Structure
+## Value Proposition
 
-The project consists of three main parts:
+- **Incentivized Fitness**: Convert physical activity into financial gains
+- **Commitment Mechanism**: Financial stakes increase accountability and adherence to fitness goals
+- **Community Building**: Compete and collaborate with friends or join public challenges
+- **Blockchain Security**: Transparent and trustless reward distribution
+- **Verifiable Activity**: Health data integration ensures honest reporting of fitness achievements
 
-- **fitstake-expo**: Mobile app built with Expo/React Native
-- **fistake-backend**: Node.js/Express backend API
-- **fitstake-contracts**: Solana smart contracts using Anchor framework
+## Architecture
 
-## 🚀 Getting Started
+FitStake consists of three integrated components:
+
+1. **Mobile Application (fitstake-expo)**
+
+   - User interface built with React Native and Expo
+   - Connects to device health APIs for activity tracking
+   - Manages wallet integration and challenge participation
+
+2. **Backend API (fistake-backend)**
+
+   - Handles user authentication and session management
+   - Verifies health data and processes challenge completions
+   - Orchestrates blockchain interactions and database operations
+
+3. **Smart Contracts (fitstake-contracts)**
+   - Solana blockchain integration using Anchor framework
+   - Manages stake escrow, challenge verification, and reward distribution
+   - Provides on-chain record keeping of user achievements
+
+## Technical Requirements
 
 ### Prerequisites
 
 - Node.js v18 or later
-- Yarn or npm
-- Expo CLI
-- Solana CLI
-- Anchor Framework
+- Yarn or npm package manager
+- Expo CLI for mobile development
+- Solana CLI tools (solana-cli, anchor)
+- MongoDB instance (local or Atlas)
 - iOS/Android device or simulator
 
-### Setup and Installation
+### Development Environment Setup
 
-1. **Clone the repository**
+1. **Repository Setup**
 
 ```bash
 git clone https://github.com/aryan877/FitStake
+cd FitStake
 ```
 
-2. **Set up environment variables**
+2. **Environment Configuration**
 
-Create `.env.local` files based on the provided examples in each directory.
+Create environment files in each project directory:
 
-3. **Install dependencies**
+- `fitstake-expo/.env.local`
+- `fistake-backend/.env`
+- `fitstake-contracts/.env`
+
+3. **Dependencies Installation**
 
 ```bash
-# Install dependencies for all projects
+# Install dependencies for all components
 cd fitstake-expo && npm install
 cd ../fistake-backend && npm install
 cd ../fitstake-contracts && npm install
 ```
 
-## 📱 Mobile App (fitstake-expo)
+## Mobile Application Configuration
 
-The mobile app allows users to:
+### Features
 
-- Connect with Privy wallet
-- Track step counts via health APIs
-- Join and create fitness challenges
-- Stake SOL on challenges
-- Monitor progress and claim rewards
+- Secure authentication via Privy wallet integration
+- Real-time health data tracking and visualization
+- Challenge discovery, creation, and participation
+- Stake management and reward claiming
+- Progress tracking and achievement display
 
-### Health Data Connectivity
+### Health Data Integration
 
-For the app to track fitness activity:
+#### iOS Implementation
 
-- **iOS users**: The app connects directly with Apple HealthKit
-- **Android users**: You need to sync your fitness app (Google Fit, Fitbit, Samsung Health, etc.) with Health Connect first. Open the Health Connect app, grant FitStake permissions, and ensure your preferred fitness app is syncing data to Health Connect.
+- Direct integration with Apple HealthKit
+- Permissions requested at first launch
+- Background step counting and activity metrics
 
-### Privy Configuration
+#### Android Implementation
 
-Both the mobile app and backend require Privy API keys for authentication:
+- Integration via Health Connect API
+- Requirements for third-party app synchronization:
+  - Install Health Connect application
+  - Grant FitStake appropriate permissions
+  - Configure primary fitness app to sync with Health Connect
 
-#### Mobile App (.env.local)
+### Environment Variables
+
+Configure the mobile app with Privy authentication credentials:
 
 ```
 EXPO_PUBLIC_PRIVY_APP_ID=your_privy_app_id
 EXPO_PUBLIC_PRIVY_CLIENT_ID=your_privy_client_id
 ```
 
-#### Backend (.env)
+### Development Workflow
+
+```bash
+# Start development server
+cd fitstake-expo
+npm run dev
+
+# Run on specific platform
+npm run ios     # For iOS simulator
+npm run android # For Android emulator
+```
+
+### Production Builds
+
+For testing with native modules, create a development client:
+
+```bash
+# Install EAS build tools
+npm install -g eas-cli
+
+# Create development build
+cd fitstake-expo
+eas build --profile development --platform ios
+# or
+eas build --profile development --platform android
+```
+
+## Backend Service Implementation
+
+### Core Functionalities
+
+- User management and authentication verification
+- Challenge creation, management, and verification
+- Health data validation and verification
+- Blockchain transaction orchestration
+- Achievement and badge system management
+
+### Environment Configuration
+
+Required environment variables:
 
 ```
 PORT=5000
@@ -90,151 +162,163 @@ Your Privy verification public key goes here
 -----END PUBLIC KEY-----"
 ```
 
-You can obtain the Privy credentials by signing up at [Privy.io](https://privy.io) and creating a new application. For MongoDB, you'll need a MongoDB Atlas account or a local MongoDB server.
+Authentication credentials can be obtained by registering at [Privy.io](https://privy.io).
 
-### Running the App
+### Database Requirements
 
-```bash
-cd fitstake-expo
-npm run dev
-```
+- MongoD
+- Collections: users, challenges, badges
 
-For iOS:
-
-```bash
-npm run ios
-```
-
-For Android:
-
-```bash
-npm run android
-```
-
-### Development Client Setup
-
-For development with custom modules, you'll need to build a development client:
-
-```bash
-# Install EAS CLI if not already installed
-npm install -g eas-cli
-
-# Build the development client
-cd fitstake-expo
-eas build --profile development --platform ios  # For iOS
-# OR
-eas build --profile development --platform android  # For Android
-```
-
-After building, you can run the development client on your device or simulator.
-
-## 🖥️ Backend (fistake-backend)
-
-The backend handles:
-
-- User authentication
-- Challenge management
-- Health data verification
-- Solana blockchain interactions
-- Badge and achievement systems
-
-### Running the Backend
+### Service Initialization
 
 ```bash
 cd fistake-backend
 npm run dev
 ```
 
-### Automated Tasks with Cron Service
+### Scheduled Tasks and Automation
 
-The backend includes a cron service that handles various automated tasks:
+The backend implements several critical automated processes:
 
-- **Challenge Verification**: Checks for ended challenges every 30 seconds
-- **Reward Processing**: Verifies participant completion and submits results to the blockchain
-- **Refund Management**: Automatically refunds stakes for challenges that didn't meet minimum participant thresholds
-- **Badge Awarding**: Processes user achievements and awards badges based on completed challenges
+1. **Challenge Lifecycle Management**
 
-The cron service interacts with Solana smart contracts to handle on-chain verification, finalization, and reward distribution in a trustless manner.
+   - Periodic verification of challenge completion (30-second intervals)
+   - Automatic reward calculation and distribution
+   - Stake refund processing for incomplete challenges
 
-### Admin Management
+2. **User Achievement Processing**
 
-Administrators in the application have one key privilege:
+   - Badge awarding based on milestone completion
+   - Leaderboard position calculation and updates
 
-- Creating public challenges that are accessible to all users
+3. **Blockchain Integration**
+   - Smart contract interaction for trustless verification
+   - Transaction signing and submission
+   - Event monitoring and state synchronization
 
-Regular users can only create private challenges that require an invitation code to join, while admin users can create challenges that are visible and joinable by anyone on the platform.
+### Administrator Capabilities
 
-#### Making a User an Admin
+Admin users have expanded privileges:
 
-To grant admin privileges to a user:
+- Creation and management of public challenges
+- System-wide announcement capabilities
+- Challenge moderation and oversight
+
+#### Administrator Management
+
+Grant admin privileges:
 
 ```bash
 cd fistake-backend
 npm run make-admin <username or wallet address>
 ```
 
-The script will:
-
-1. Connect to the MongoDB database
-2. Find the user by the provided identifier
-3. Update the user's `isAdmin` field to `true`
-4. Save the changes to the database
-
-#### Removing Admin Privileges
-
-To remove admin status from a user:
+Remove admin privileges:
 
 ```bash
 cd fistake-backend
 npm run remove-admin <username or wallet address>
 ```
 
-The script performs similar steps as the makeAdmin script but sets the `isAdmin` field to `false`.
+## Smart Contract Architecture
 
-## ⛓️ Smart Contracts (fitstake-contracts)
+### Contract Functionality
 
-The Solana smart contracts manage:
+The Solana smart contracts provide:
 
-- Challenge creation and verification
-- Stake management
-- Reward distribution
-- On-chain record keeping
+- Secure escrow for staked tokens
+- Verifiable challenge creation and management
+- Trustless reward calculation and distribution
+- Permanent on-chain achievement records
 
-### Building and Deploying Contracts
+### Deployment Process
 
 ```bash
 cd fitstake-contracts
 ./build-deploy-copy.sh
 ```
 
-This script will:
+This script performs:
 
-1. Build the Anchor contracts
-2. Deploy to Solana devnet
-3. Copy the IDL and keypair files to the frontend and backend
+1. Anchor program compilation
+2. Devnet deployment
+3. IDL and keypair generation
+4. Configuration file distribution to frontend and backend
 
-## 🔄 Workflow
+### Security Considerations
 
-The typical workflow for the application:
+- All critical operations require proper authority signatures
+- Time-locked contracts prevent premature withdrawals
+- Oracle integration for external data verification
+- Circuit breaker mechanisms for emergency situations
 
-1. User creates or joins a challenge via the mobile app
-2. User stakes SOL tokens on the challenge
-3. User tracks fitness activity through health APIs
-4. Backend verifies fitness data
-5. Smart contracts manage staking and rewards
-6. User completes challenge and claims rewards
+## Application Workflow
 
-## 🤝 Contributing
+The typical user journey follows these steps:
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+1. **Account Creation and Setup**
 
-## 📄 License
+   - User registers via mobile application
+   - Connects Privy wallet for secure authentication
+   - Grants health data access permissions
+
+2. **Challenge Participation**
+
+   - Discovers available challenges or creates new ones
+   - Stakes SOL tokens as commitment
+   - Invites friends or joins existing challenges
+
+3. **Activity Tracking**
+
+   - System monitors fitness activities via health APIs
+   - Progress displayed in real-time on dashboard
+   - Notifications for goal milestones and achievements
+
+4. **Verification and Rewards**
+
+   - Backend validates completed challenges
+   - Smart contracts calculate and distribute rewards
+   - Users claim rewards directly to their wallets
+
+5. **Achievement Recognition**
+   - Badges awarded for completed challenges
+   - Profile statistics updated with accomplishments
+   - Social sharing options for achievements
+
+## Contributing
+
+Contributions are welcome through the following methods:
+
+- Feature implementation via pull requests
+- Bug reports through GitHub issues
+- Documentation improvements
+- Testing and quality assurance
+
+Please follow the established code style and include appropriate tests.
+
+## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 🛠️ Tech Stack
+## Technology Stack
 
-- **Frontend**: React Native, Expo, TypeScript, Privy for authentication
-- **Backend**: Node.js, Express, MongoDB, TypeScript
-- **Blockchain**: Solana, Anchor framework
-- **Health Data**: Expo Health Connect, Google Fit, Apple HealthKit
+### Frontend Technologies
+
+- React Native with Expo framework
+- TypeScript for type safety
+- Privy SDK for authentication
+- Health Connect and HealthKit integrations
+
+### Backend Stack
+
+- Node.js runtime environment
+- Express.js web framework
+- MongoDB database system
+- TypeScript programming language
+- JWT-based authentication
+
+### Blockchain Integration
+
+- Solana blockchain infrastructure
+- Anchor framework for smart contract development
+- Web3.js for blockchain interactions
