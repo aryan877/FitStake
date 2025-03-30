@@ -157,6 +157,7 @@ export interface ChallengeDetails {
   isActive: boolean;
   isCompleted: boolean;
   isPublic: boolean;
+  onChainVerificationComplete?: boolean;
 }
 
 export interface ChallengeParams {

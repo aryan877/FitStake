@@ -411,7 +411,7 @@ export default function ChallengeDetailsScreen() {
 
     try {
       setClaimingReward(true);
-      const success = await claimReward(challenge.challengeId);
+      const success = await claimReward(challenge.id);
 
       if (success) {
         showSuccessToast('Successfully claimed your reward!');
@@ -534,6 +534,10 @@ export default function ChallengeDetailsScreen() {
     userParticipant?.completed &&
     !userParticipant?.claimed;
 
+  // Check if challenge verification is pending
+  const isVerificationPending =
+    challenge?.isCompleted && !challenge?.onChainVerificationComplete;
+
   // Check if user failed the challenge
   const userFailedChallenge =
     challenge?.isCompleted && userParticipant && !userParticipant.completed;
@@ -597,6 +601,7 @@ export default function ChallengeDetailsScreen() {
               isSubmitting={submitting}
               isLoading={healthDataLoading}
               isClaimingReward={claimingReward}
+              isVerificationPending={isVerificationPending}
             />
           )}
 

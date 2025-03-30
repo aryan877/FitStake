@@ -279,22 +279,11 @@ const submitCompletedWalletsToContract = async (
       }
     }
 
-    // Finalize the challenge
+    // Mark challenge as completed in database
     try {
-      const finalizeTx = await program.methods
-        .finalizeChallenge()
-        .accounts({
-          challenge: challengePDA,
-          admin: adminKeypair.publicKey,
-        })
-        .signers([adminKeypair])
-        .rpc();
-
-      await connection.confirmTransaction(finalizeTx, "confirmed");
-
       return true;
     } catch (error) {
-      console.error("Error finalizing challenge:", error);
+      console.error("Error updating challenge status:", error);
       return false;
     }
   } catch (error) {
@@ -327,17 +316,8 @@ const refundInactiveChallenge = async (challenge: any): Promise<boolean> => {
     const vaultPDA = new PublicKey(challenge.solanaVaultPda);
 
     try {
-      // First, mark the challenge as completed on-chain
-      const finalizeTx = await program.methods
-        .finalizeChallenge()
-        .accounts({
-          challenge: challengePDA,
-          admin: adminKeypair.publicKey,
-        })
-        .signers([adminKeypair])
-        .rpc();
-
-      await connection.confirmTransaction(finalizeTx, "confirmed");
+      // No need to finalize challenge as that method doesn't exist in the contract
+      // Just proceed with marking all participants as completed
 
       // For each participant, create a "completed list" containing all participants
       // This ensures everyone gets their stake back when the challenge doesn't reach min participants

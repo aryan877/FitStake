@@ -10,6 +10,7 @@ import {
   FlatList,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -263,82 +264,88 @@ export default function MyChallengesScreen() {
       </View>
 
       <View style={styles.filtersContainer}>
-        <Pressable
-          style={[
-            styles.filterButton,
-            activeFilter === 'ACTIVE' && styles.activeFilterButton,
-          ]}
-          onPress={() => handleFilterChange('ACTIVE')}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filtersScrollContent}
         >
-          <Text
+          <Pressable
             style={[
-              styles.filterText,
-              activeFilter === 'ACTIVE' && styles.activeFilterText,
+              styles.filterButton,
+              activeFilter === 'ACTIVE' && styles.activeFilterButton,
             ]}
+            onPress={() => handleFilterChange('ACTIVE')}
           >
-            Active
-          </Text>
-        </Pressable>
+            <Text
+              style={[
+                styles.filterText,
+                activeFilter === 'ACTIVE' && styles.activeFilterText,
+              ]}
+            >
+              Active
+            </Text>
+          </Pressable>
 
-        <Pressable
-          style={[
-            styles.filterButton,
-            activeFilter === 'UPCOMING' && styles.activeFilterButton,
-            activeFilter === 'UPCOMING' && {
-              backgroundColor: colors.accent.info,
-            },
-          ]}
-          onPress={() => handleFilterChange('UPCOMING')}
-        >
-          <Text
+          <Pressable
             style={[
-              styles.filterText,
-              activeFilter === 'UPCOMING' && styles.activeFilterText,
+              styles.filterButton,
+              activeFilter === 'UPCOMING' && styles.activeFilterButton,
+              activeFilter === 'UPCOMING' && {
+                backgroundColor: colors.accent.info,
+              },
             ]}
+            onPress={() => handleFilterChange('UPCOMING')}
           >
-            Upcoming
-          </Text>
-        </Pressable>
+            <Text
+              style={[
+                styles.filterText,
+                activeFilter === 'UPCOMING' && styles.activeFilterText,
+              ]}
+            >
+              Upcoming
+            </Text>
+          </Pressable>
 
-        <Pressable
-          style={[
-            styles.filterButton,
-            activeFilter === 'COMPLETED' && styles.activeFilterButton,
-            activeFilter === 'COMPLETED' && {
-              backgroundColor: colors.accent.success,
-            },
-          ]}
-          onPress={() => handleFilterChange('COMPLETED')}
-        >
-          <Text
+          <Pressable
             style={[
-              styles.filterText,
-              activeFilter === 'COMPLETED' && styles.activeFilterText,
+              styles.filterButton,
+              activeFilter === 'COMPLETED' && styles.activeFilterButton,
+              activeFilter === 'COMPLETED' && {
+                backgroundColor: colors.accent.success,
+              },
             ]}
+            onPress={() => handleFilterChange('COMPLETED')}
           >
-            Completed
-          </Text>
-        </Pressable>
+            <Text
+              style={[
+                styles.filterText,
+                activeFilter === 'COMPLETED' && styles.activeFilterText,
+              ]}
+            >
+              Completed
+            </Text>
+          </Pressable>
 
-        <Pressable
-          style={[
-            styles.filterButton,
-            activeFilter === 'FAILED' && styles.activeFilterButton,
-            activeFilter === 'FAILED' && {
-              backgroundColor: colors.accent.error,
-            },
-          ]}
-          onPress={() => handleFilterChange('FAILED')}
-        >
-          <Text
+          <Pressable
             style={[
-              styles.filterText,
-              activeFilter === 'FAILED' && styles.activeFilterText,
+              styles.filterButton,
+              activeFilter === 'FAILED' && styles.activeFilterButton,
+              activeFilter === 'FAILED' && {
+                backgroundColor: colors.accent.error,
+              },
             ]}
+            onPress={() => handleFilterChange('FAILED')}
           >
-            Failed
-          </Text>
-        </Pressable>
+            <Text
+              style={[
+                styles.filterText,
+                activeFilter === 'FAILED' && styles.activeFilterText,
+              ]}
+            >
+              Failed
+            </Text>
+          </Pressable>
+        </ScrollView>
       </View>
 
       {loading ? (
@@ -398,9 +405,12 @@ const styles = StyleSheet.create({
     color: colors.gray[400],
   },
   filtersContainer: {
-    flexDirection: 'row',
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.md,
+  },
+  filtersScrollContent: {
+    flexDirection: 'row',
+    paddingRight: spacing.md, // Extra padding at the end for scroll
   },
   filterButton: {
     paddingVertical: spacing.xs + 2,
@@ -408,6 +418,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     marginRight: spacing.sm,
     backgroundColor: colors.gray[800],
+    minWidth: 80, // Ensure minimum width for tabs
   },
   activeFilterButton: {
     backgroundColor: colors.accent.primary,

@@ -407,7 +407,7 @@ export const useChallenges = () => {
    * Claims rewards for a completed challenge
    */
   const claimReward = useCallback(
-    async (challengeId: string) => {
+    async (id: string) => {
       if (!authenticated || !walletAddress) {
         setError('User not authenticated');
         return false;
@@ -418,20 +418,36 @@ export const useChallenges = () => {
 
       try {
         // Get challenge details
-        const challengeResponse = await challengeApi.getById(challengeId);
+        const challengeResponse = await challengeApi.getById(id);
         if (!challengeResponse.success || !challengeResponse.data) {
           throw new Error('Challenge not found');
         }
 
         const challenge = challengeResponse.data;
 
-        // Get Anchor program and build transaction
+        // Verify challenge has been processed on-chain
+        if (!challenge.onChainVerificationComplete) {
+          throw new Error(
+            'Challenge verification not yet complete. Please try again later.'
+          );
+        }
+
+        // Verify challenge has ended
+        const currentTime = Math.floor(Date.now() / 1000);
+        if (currentTime < challenge.endTime) {
+          throw new Error('Challenge has not ended yet');
+        }
+
+        // Get Anchor program
         const program = await getAnchorProgram();
+
+        // Get PDAs
         const challengePda = new PublicKey(challenge.solanaChallengePda);
         const vaultPda = new PublicKey(challenge.solanaVaultPda);
         const walletPubkey = new PublicKey(walletAddress);
 
-        const [participantPda] = await PublicKey.findProgramAddressSync(
+        // Find participant PDA
+        const [participantPda] = PublicKey.findProgramAddressSync(
           [
             Buffer.from('participant'),
             challengePda.toBuffer(),
@@ -440,11 +456,22 @@ export const useChallenges = () => {
           program.programId
         );
 
-        const [completedListPda] = await PublicKey.findProgramAddressSync(
+        // Find completed list PDA
+        const [completedListPda] = PublicKey.findProgramAddressSync(
           [Buffer.from('completed_list'), challengePda.toBuffer()],
           program.programId
         );
 
+        console.log('Claim reward transaction accounts:', {
+          challenge: challengePda.toString(),
+          participant: participantPda.toString(),
+          completedList: completedListPda.toString(),
+          vault: vaultPda.toString(),
+          participantAuthority: walletPubkey.toString(),
+          systemProgram: SystemProgram.programId.toString(),
+        });
+
+        // Build the transaction
         const tx = await program.methods
           .claimReward()
           .accounts({
@@ -457,14 +484,39 @@ export const useChallenges = () => {
           })
           .transaction();
 
+        // Set the fee payer explicitly
+        tx.feePayer = walletPubkey;
+
+        // Add recent blockhash for transaction validity
+        const conn = connection || new Connection(SOLANA_RPC_URL, 'confirmed');
+        const { blockhash } = await conn.getLatestBlockhash('confirmed');
+        tx.recentBlockhash = blockhash;
+
+        // Send transaction
         const result = await sendTransaction(tx);
         if (!result.success) {
-          throw new Error(`Failed to send transaction: ${result.error}`);
+          // Add more detailed error handling
+          if (result.error && result.error.includes('NotCompleted')) {
+            throw new Error(
+              'You have not completed this challenge or are not in the completed list'
+            );
+          } else if (result.error && result.error.includes('AlreadyClaimed')) {
+            throw new Error(
+              'You have already claimed rewards for this challenge'
+            );
+          } else if (
+            result.error &&
+            result.error.includes('ChallengeNotEnded')
+          ) {
+            throw new Error('Challenge has not ended yet');
+          } else {
+            throw new Error(`Failed to send transaction: ${result.error}`);
+          }
         }
 
         // Update backend
         const response = await challengeApi.claimReward(
-          challengeId,
+          id,
           result.signature || ''
         );
 
@@ -479,7 +531,7 @@ export const useChallenges = () => {
         }
       } catch (err: any) {
         console.error('Error claiming reward:', err);
-        setError(err.message || 'Failed to claim reward');
+        setError(err || 'Failed to claim reward');
         return false;
       } finally {
         setLoading(false);
@@ -492,6 +544,7 @@ export const useChallenges = () => {
       sendTransaction,
       fetchChallenges,
       filterParams,
+      connection,
     ]
   );
 

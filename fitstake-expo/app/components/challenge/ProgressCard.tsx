@@ -1,9 +1,10 @@
 import theme from '@/app/theme';
 import { AlertCircle, RefreshCw, Upload } from 'lucide-react-native';
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   Platform,
   Pressable,
   StyleSheet,
@@ -28,6 +29,7 @@ interface ProgressCardProps {
   isSubmitting: boolean;
   isLoading: boolean;
   isClaimingReward: boolean;
+  isVerificationPending?: boolean;
 }
 
 export const ProgressCard = ({
@@ -44,7 +46,31 @@ export const ProgressCard = ({
   isSubmitting,
   isLoading,
   isClaimingReward,
+  isVerificationPending = false,
 }: ProgressCardProps) => {
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (isVerificationPending) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 1500,
+            useNativeDriver: false,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 0,
+            duration: 1500,
+            useNativeDriver: false,
+          }),
+        ])
+      ).start();
+    } else {
+      pulseAnim.stopAnimation();
+    }
+  }, [isVerificationPending, pulseAnim]);
+
   const showRefreshInfo = () => {
     if (Platform.OS === 'android') {
       ToastAndroid.show(
@@ -154,6 +180,27 @@ export const ProgressCard = ({
             </>
           )}
         </Pressable>
+      ) : isVerificationPending ? (
+        <View style={styles.verificationPendingContainer}>
+          <Animated.View
+            style={[
+              styles.verifyingPulse,
+              {
+                left: pulseAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['-30%', '100%'],
+                }),
+              },
+            ]}
+          />
+          <View style={styles.verifyingTextContainer}>
+            <Text style={styles.verifyingTitle}>Verification in Progress</Text>
+            <Text style={styles.verifyingText}>
+              Results are being verified on-chain. Check back soon to claim your
+              reward.
+            </Text>
+          </View>
+        </View>
       ) : isEligibleForReward ? (
         <Pressable
           style={[
@@ -318,9 +365,47 @@ const styles = StyleSheet.create({
     fontWeight: fontWeight.medium,
   },
   claimedText: {
-    color: colors.accent.primary,
-    fontSize: fontSize.md,
+    fontSize: fontSize.sm,
     fontWeight: fontWeight.medium,
+    color: colors.accent.primary,
+  },
+  verificationPendingContainer: {
+    backgroundColor: colors.gray[800],
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.gray[700],
+  },
+  verifyingPulse: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    height: 3,
+    width: '30%',
+    backgroundColor: colors.accent.secondary,
+    borderRadius: borderRadius.full,
+    opacity: 0.9,
+    shadowColor: colors.accent.secondary,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.5,
+    shadowRadius: 2,
+  },
+  verifyingTextContainer: {
+    paddingTop: spacing.sm,
+  },
+  verifyingTitle: {
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.semibold,
+    color: colors.white,
+    marginBottom: spacing.xs,
+    textAlign: 'center',
+  },
+  verifyingText: {
+    fontSize: fontSize.sm,
+    color: colors.gray[300],
+    textAlign: 'center',
+    lineHeight: 18,
   },
   disabledButton: {
     opacity: 0.6,
