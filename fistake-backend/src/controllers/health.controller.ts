@@ -20,6 +20,9 @@ export const submitHealthData = async (
     const { did } = req.user;
     const { id } = req.params;
     const { healthData } = req.body;
+    const { platform } = req.query;
+
+    const isAppleHealth = platform === "apple";
 
     // Verify user and wallet
     const user = await UserModel.findOne({ privyId: did });
@@ -73,80 +76,110 @@ export const submitHealthData = async (
       const date = item.date;
       const steps = Number(item.count) || 0;
 
-      // Basic verification checks
-      const hasSources = Array.isArray(item.sources) && item.sources.length > 0;
-      const hasRecordCount = Number(item.recordCount) > 0;
+      // Basic verification checks (common for both platforms)
       const hasReasonableStepCount = steps >= 0 && steps <= 100000;
-      const hasDetailedRecords =
-        Array.isArray(item.records) && item.records.length > 0;
 
-      // Check for suspicious data
-      let isSuspicious = false;
-      let anomalyDetails = [];
+      // Platform-specific verification
+      let isVerified = false;
+      let anomalyDetails: string[] = [];
 
-      if (hasDetailedRecords) {
-        // Verify aggregated count matches sum of records
-        const sumOfIndividualCounts = item.records.reduce(
-          (sum: number, record: any) => sum + (record.count || 0),
-          0
-        );
+      if (isAppleHealth) {
+        // Less stringent verification for Apple Health
+        // Apple Health data tends to have fewer sources and less detailed metadata
 
-        const countMatchesRecords =
-          Math.abs(steps - sumOfIndividualCounts) <= 5;
-        if (!countMatchesRecords && steps > sumOfIndividualCounts + 50) {
-          isSuspicious = true;
-          anomalyDetails.push(
-            `Aggregated count (${steps}) much higher than sum of records (${sumOfIndividualCounts})`
+        // For Apple Health, just check if steps are reasonable and non-zero
+        isVerified = hasReasonableStepCount && steps > 0;
+
+        // If suspiciously high steps, flag it but still consider valid if not extreme
+        if (steps > 30000 && steps <= 50000) {
+          console.log(
+            `High but possible step count detected: ${steps} from Apple Health`
           );
+          // Still consider valid but log warning
+        } else if (steps > 50000) {
+          isVerified = false;
+          anomalyDetails.push(`Extremely high step count: ${steps}`);
         }
 
-        // Check record timestamps
-        const startDate = new Date(date);
-        startDate.setHours(0, 0, 0, 0);
-        const endDate = new Date(date);
-        endDate.setHours(23, 59, 59, 999);
+        // Log for debugging
+        if (item.sources && item.sources.length > 0) {
+          console.log(`Apple Health sources: ${item.sources.join(", ")}`);
+        }
+      } else {
+        // More stringent verification for Android/Health Connect
+        const hasSources =
+          Array.isArray(item.sources) && item.sources.length > 0;
+        const hasRecordCount = Number(item.recordCount) > 0;
+        const hasDetailedRecords =
+          Array.isArray(item.records) && item.records.length > 0;
 
-        const recordsWithInvalidTimes = item.records.filter((record: any) => {
-          const startTime = new Date(record.startTime);
-          const endTime = new Date(record.endTime);
-          const isWithinDay = startTime >= startDate && endTime <= endDate;
-          const durationMs = endTime.getTime() - startTime.getTime();
-          const durationIsReasonable = durationMs > 0 && durationMs < 3600000; // < 1 hour
-          return !isWithinDay || !durationIsReasonable;
-        });
+        // Check for suspicious data (Android only)
+        let isSuspicious = false;
 
-        if (recordsWithInvalidTimes.length > 0) {
-          isSuspicious = true;
-          anomalyDetails.push(
-            `${recordsWithInvalidTimes.length} records have suspicious timestamps`
+        if (hasDetailedRecords) {
+          // Verify aggregated count matches sum of records
+          const sumOfIndividualCounts = item.records.reduce(
+            (sum: number, record: any) => sum + (record.count || 0),
+            0
           );
+
+          const countMatchesRecords =
+            Math.abs(steps - sumOfIndividualCounts) <= 5;
+          if (!countMatchesRecords && steps > sumOfIndividualCounts + 50) {
+            isSuspicious = true;
+            anomalyDetails.push(
+              `Aggregated count (${steps}) much higher than sum of records (${sumOfIndividualCounts})`
+            );
+          }
+
+          // Check record timestamps
+          const startDate = new Date(date);
+          startDate.setHours(0, 0, 0, 0);
+          const endDate = new Date(date);
+          endDate.setHours(23, 59, 59, 999);
+
+          const recordsWithInvalidTimes = item.records.filter((record: any) => {
+            const startTime = new Date(record.startTime);
+            const endTime = new Date(record.endTime);
+            const isWithinDay = startTime >= startDate && endTime <= endDate;
+            const durationMs = endTime.getTime() - startTime.getTime();
+            const durationIsReasonable = durationMs > 0 && durationMs < 3600000; // < 1 hour
+            return !isWithinDay || !durationIsReasonable;
+          });
+
+          if (recordsWithInvalidTimes.length > 0) {
+            isSuspicious = true;
+            anomalyDetails.push(
+              `${recordsWithInvalidTimes.length} records have suspicious timestamps`
+            );
+          }
+
+          // Check data sources
+          const hasKnownSources = item.sources.some(
+            (source: string) =>
+              source.includes("fitbit") ||
+              source.includes("google.android.apps.fitness") ||
+              source.includes("samsung.health") ||
+              source.includes("mi.health") ||
+              source.includes("huawei.health")
+          );
+
+          if (!hasKnownSources) {
+            isSuspicious = true;
+            anomalyDetails.push(
+              `Unknown data sources: ${item.sources.join(", ")}`
+            );
+          }
         }
 
-        // Check data sources
-        const hasKnownSources = item.sources.some(
-          (source: string) =>
-            source.includes("fitbit") ||
-            source.includes("google.android.apps.fitness") ||
-            source.includes("samsung.health") ||
-            source.includes("mi.health") ||
-            source.includes("huawei.health")
-        );
-
-        if (!hasKnownSources) {
-          isSuspicious = true;
-          anomalyDetails.push(
-            `Unknown data sources: ${item.sources.join(", ")}`
-          );
-        }
+        // Determine if record is verified for Android
+        isVerified =
+          hasSources &&
+          hasRecordCount &&
+          hasReasonableStepCount &&
+          hasDetailedRecords &&
+          !isSuspicious;
       }
-
-      // Determine if record is verified
-      const isVerified =
-        hasSources &&
-        hasRecordCount &&
-        hasReasonableStepCount &&
-        hasDetailedRecords &&
-        !isSuspicious;
 
       if (isVerified) totalVerifiedRecords++;
       else if (steps > 0) {
@@ -156,9 +189,14 @@ export const submitHealthData = async (
         }
       }
 
-      // Final step count - only count valid steps
-      const finalStepCount =
-        hasReasonableStepCount && !isSuspicious ? steps : 0;
+      // Final step count - accept steps for Apple Health with minimal validation
+      const finalStepCount = isAppleHealth
+        ? hasReasonableStepCount
+          ? steps
+          : 0 // Only check if reasonable for Apple
+        : isVerified && hasReasonableStepCount
+        ? steps
+        : 0; // Full verification for Android
 
       return {
         date,
@@ -185,6 +223,11 @@ export const submitHealthData = async (
     if (isCompleted) {
       challenge.participants[participantIndex].completed = true;
     }
+
+    // Log summary of verification results
+    console.log(
+      `Platform: ${platform}, Verified: ${totalVerifiedRecords}, Suspicious: ${totalSuspiciousRecords}, Total Steps: ${totalSteps}`
+    );
 
     await challenge.save();
 

@@ -70,7 +70,11 @@ export default function ChallengeDetailsScreen() {
   // Timer ref for cleanup
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const { fetchStepsForDateRange, loading: healthDataLoading } = useHealth();
+  const {
+    fetchStepsForDateRange,
+    loading: healthDataLoading,
+    getHealthProvider,
+  } = useHealth();
 
   // Update time remaining
   const updateTimeRemaining = useCallback(() => {
@@ -197,7 +201,8 @@ export default function ChallengeDetailsScreen() {
       const result = await submitChallengeHealthData(
         challenge.id,
         latestHealthData,
-        challenge.goal.value
+        challenge.goal.value,
+        getHealthProvider()
       );
 
       if (result.success) {

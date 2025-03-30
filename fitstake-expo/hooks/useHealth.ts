@@ -35,6 +35,11 @@ export const useHealth = () => {
   const [loading, setLoading] = useState(false);
   const { isInitialized, hasPermissions, stepsData, error } = implementation;
 
+  // Returns the current health provider name for backend verification
+  const getHealthProvider = useCallback(() => {
+    return isIOS ? 'apple' : 'android';
+  }, [isIOS]);
+
   // Initialize health service
   const initialize = useCallback(async () => {
     if (isIOS) {
@@ -148,5 +153,6 @@ export const useHealth = () => {
     setupHealth,
     refreshStepsData,
     getStepsForLastWeek,
+    getHealthProvider,
   };
 };

@@ -258,13 +258,20 @@ export const challengeApi = {
   submitHealthData: async (
     id: string,
     healthData: StepsData[],
-    targetSteps: number
+    targetSteps: number,
+    platform?: string
   ) => {
     try {
-      const response = await api.post(`/health/challenges/${id}/health-data`, {
-        healthData,
-        targetSteps,
-      });
+      const response = await api.post(
+        `/health/challenges/${id}/health-data`,
+        {
+          healthData,
+          targetSteps,
+        },
+        {
+          params: { platform },
+        }
+      );
 
       if (!response.data?.success) {
         throw new Error(

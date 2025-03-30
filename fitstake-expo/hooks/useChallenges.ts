@@ -347,7 +347,8 @@ export const useChallenges = () => {
     async (
       challengeId: string,
       healthData: StepsData[],
-      targetSteps: number
+      targetSteps: number,
+      platform?: string
     ) => {
       if (!authenticated) {
         setError('User not authenticated');
@@ -364,7 +365,8 @@ export const useChallenges = () => {
         const response = await challengeApi.submitHealthData(
           challengeId,
           healthData,
-          targetSteps
+          targetSteps,
+          platform
         );
 
         if (response.success && response.data) {
