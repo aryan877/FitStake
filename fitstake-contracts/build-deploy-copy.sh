@@ -12,9 +12,10 @@ echo -e "${YELLOW}===================================${NC}"
 echo -e "${YELLOW}   FitStake Contract Deployment    ${NC}"
 echo -e "${YELLOW}===================================${NC}"
 
-# Clean up existing keypairs and build artifacts to start fresh
+# Clean up build artifacts but preserve keypair if it exists
 echo -e "\n${YELLOW}Cleaning up previous deployment files...${NC}"
-rm -f keypair.json
+# Don't remove keypair.json anymore
+# rm -f keypair.json
 rm -rf target/deploy/*-keypair.json
 rm -rf .anchor
 
@@ -35,9 +36,14 @@ if [[ $NETWORK == "NOT_DEVNET" ]]; then
     solana config set --url https://api.devnet.solana.com
 fi
 
-# Generate a new keypair for deployment
-echo -e "${GREEN}Generating new deployment keypair...${NC}"
-solana-keygen new -o keypair.json --no-bip39-passphrase --force
+# Check if keypair.json exists
+if [ -f "keypair.json" ]; then
+    echo -e "${GREEN}Using existing deployment keypair...${NC}"
+else
+    # Generate a new keypair for deployment
+    echo -e "${GREEN}Generating new deployment keypair...${NC}"
+    solana-keygen new -o keypair.json --no-bip39-passphrase --force
+fi
 
 # Get keypair public key
 PUBKEY=$(solana-keygen pubkey keypair.json)

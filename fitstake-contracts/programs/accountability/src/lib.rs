@@ -116,7 +116,6 @@ pub mod accountability {
         
         // Verify challenge is active and not completed
         require!(challenge.is_active, AccountingError::ChallengeNotActive);
-        require!(!challenge.is_completed, AccountingError::ChallengeCompleted);
         
         // Store the participant wallets in the challenge's completed list
         let completed_list = &mut ctx.accounts.completed_list;
@@ -127,40 +126,23 @@ pub mod accountability {
         Ok(())
     }
 
-    // Mark challenge as completed by admin
-    pub fn finalize_challenge(ctx: Context<FinalizeChallenge>) -> Result<()> {
+    // Distribute rewards to winners who completed the challenge
+    pub fn claim_reward(ctx: Context<ClaimReward>) -> Result<()> {
         let challenge = &mut ctx.accounts.challenge;
-        
-        // Verify the caller is the admin of this challenge
-        require!(
-            ctx.accounts.admin.key() == challenge.admin,
-            AccountingError::UnauthorizedAdmin
-        );
-        
-        // Verify challenge is active
-        require!(challenge.is_active, AccountingError::ChallengeNotActive);
-        
-        // Verify challenge is past end time
+        let participant = &mut ctx.accounts.participant;
+        let completed_list = &ctx.accounts.completed_list;
+
+        // Verify challenge has ended
         let current_time = Clock::get()?.unix_timestamp;
         require!(
             current_time >= challenge.end_time,
             AccountingError::ChallengeNotEnded
         );
         
-        // Mark challenge as completed
-        challenge.is_completed = true;
-        
-        Ok(())
-    }
-
-    // Distribute rewards to winners who completed the challenge
-    pub fn claim_reward(ctx: Context<ClaimReward>) -> Result<()> {
-        let challenge = &ctx.accounts.challenge;
-        let participant = &mut ctx.accounts.participant;
-        let completed_list = &ctx.accounts.completed_list;
-
-        // Verify challenge is completed
-        require!(challenge.is_completed, AccountingError::ChallengeNotCompleted);
+        // Mark the challenge as completed if it hasn't been marked already
+        if !challenge.is_completed {
+            challenge.is_completed = true;
+        }
         
         // Verify participant hasn't already claimed rewards
         require!(!participant.claimed, AccountingError::AlreadyClaimed);
@@ -291,17 +273,6 @@ pub struct AdminCompleteChallenge<'info> {
     
     // Required for creating new accounts on Solana
     pub system_program: Program<'info, System>,
-}
-
-// Account structure for finalizing a challenge
-#[derive(Accounts)]
-pub struct FinalizeChallenge<'info> {
-    // Challenge account - will be marked as completed
-    #[account(mut)]
-    pub challenge: Account<'info, Challenge>,
-    
-    // Admin wallet that signs the transaction
-    pub admin: Signer<'info>,
 }
 
 // Account structure for claiming rewards

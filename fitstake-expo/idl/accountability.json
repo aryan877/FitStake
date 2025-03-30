@@ -118,22 +118,6 @@
       ]
     },
     {
-      "name": "finalizeChallenge",
-      "accounts": [
-        {
-          "name": "challenge",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "admin",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": []
-    },
-    {
       "name": "claimReward",
       "accounts": [
         {
