@@ -1,5 +1,4 @@
 import express from "express";
-import { claimReward } from "../controllers/challenge.controller";
 import {
   getProgress,
   submitHealthData,
@@ -15,6 +14,5 @@ router.post(
   submitHealthData
 );
 router.get("/challenges/:id/progress", authenticatePrivyToken, getProgress);
-router.post("/challenges/:id/claim", authenticatePrivyToken, claimReward);
 
 export default router;

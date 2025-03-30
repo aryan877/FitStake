@@ -224,9 +224,17 @@ export const getUserChallenges = async (
     } else if (status === "ACTIVE") {
       query["participants.completed"] = false;
       query.isCompleted = false;
+      // For active challenges, ensure the challenge has started
+      const currentTime = Math.floor(Date.now() / 1000); // Current time in seconds
+      query.startTime = { $lte: currentTime };
     } else if (status === "FAILED") {
       query.isCompleted = true;
       query["participants.completed"] = false;
+    } else if (status === "UPCOMING") {
+      // For upcoming challenges, ensure the challenge has not started yet
+      const currentTime = Math.floor(Date.now() / 1000); // Current time in seconds
+      query.startTime = { $gt: currentTime };
+      query.isCompleted = false;
     }
 
     const challenges = await Challenge.find(query)

@@ -36,9 +36,10 @@ export const colors = {
 
   // Status colors with alpha values
   status: {
-    active: 'rgba(255, 76, 0, 0.12)',
-    completed: 'rgba(52, 199, 89, 0.12)',
-    failed: 'rgba(255, 59, 48, 0.12)',
+    active: 'rgba(99, 102, 241, 0.1)',
+    completed: 'rgba(16, 185, 129, 0.1)',
+    failed: 'rgba(239, 68, 68, 0.1)',
+    upcoming: 'rgba(0, 191, 255, 0.1)',
   },
 
   // Surface colors

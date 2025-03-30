@@ -1,5 +1,6 @@
 import express from "express";
 import {
+  claimReward,
   createChallenge,
   getChallengeById,
   getChallenges,
@@ -18,5 +19,6 @@ router.get("/:id", authenticatePrivyToken, getChallengeById);
 router.get("/user/challenges", authenticatePrivyToken, getUserChallenges);
 router.post("/", authenticatePrivyToken, createChallenge);
 router.post("/:id/join", authenticatePrivyToken, joinChallenge);
+router.post("/:id/claim", authenticatePrivyToken, claimReward);
 
 export default router;

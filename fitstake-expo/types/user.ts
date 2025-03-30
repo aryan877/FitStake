@@ -27,5 +27,5 @@ export interface UserBadge {
 export interface UserChallengeParams {
   page?: number;
   limit?: number;
-  status?: string;
+  status?: 'ACTIVE' | 'COMPLETED' | 'FAILED' | 'UPCOMING' | string;
 }

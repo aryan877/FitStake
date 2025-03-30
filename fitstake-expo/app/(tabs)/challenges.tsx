@@ -31,7 +31,7 @@ export default function MyChallengesScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState<
-    'ACTIVE' | 'COMPLETED' | 'FAILED' | undefined
+    'ACTIVE' | 'COMPLETED' | 'FAILED' | 'UPCOMING' | undefined
   >('ACTIVE');
 
   const fetchUserChallenges = async (status?: string) => {
@@ -107,7 +107,7 @@ export default function MyChallengesScreen() {
   };
 
   const handleFilterChange = (
-    filter: 'ACTIVE' | 'COMPLETED' | 'FAILED' | undefined
+    filter: 'ACTIVE' | 'COMPLETED' | 'FAILED' | 'UPCOMING' | undefined
   ) => {
     setActiveFilter(filter);
     setLoading(true);
@@ -122,21 +122,33 @@ export default function MyChallengesScreen() {
       100,
       Math.max(0, Math.floor(item.progress * 100))
     );
-    const statusBadge = item.completed
+
+    // Determine if challenge is upcoming by checking startTime
+    const currentTime = Math.floor(Date.now() / 1000); // Current time in seconds
+    const isUpcoming = item.startTime > currentTime;
+
+    // Set status badge based on challenge state
+    const statusBadge = isUpcoming
+      ? 'Upcoming'
+      : item.completed
       ? 'Completed'
       : item.claimed
       ? 'Claimed'
       : 'In Progress';
 
     // Set colors based on challenge status
-    const statusColor = item.completed
+    const statusColor = isUpcoming
+      ? colors.accent.info
+      : item.completed
       ? colors.accent.success
       : item.claimed
       ? colors.accent.warning
       : colors.accent.primary;
 
     // Set background color for status badge
-    const statusBgColor = item.completed
+    const statusBgColor = isUpcoming
+      ? colors.status.upcoming || 'rgba(0, 191, 255, 0.1)' // Fallback light blue bg for upcoming
+      : item.completed
       ? colors.status.completed
       : item.claimed
       ? colors.status.active
@@ -181,7 +193,7 @@ export default function MyChallengesScreen() {
             <View style={styles.progressLabelRow}>
               <Text style={styles.progressText}>Progress</Text>
               <Text style={[styles.progressPercentage, { color: statusColor }]}>
-                {progressPercentage}%
+                {isUpcoming ? 'Not started' : `${progressPercentage}%`}
               </Text>
             </View>
             <View style={styles.progressBar}>
@@ -189,7 +201,7 @@ export default function MyChallengesScreen() {
                 style={[
                   styles.progressFill,
                   {
-                    width: `${progressPercentage}%`,
+                    width: isUpcoming ? '0%' : `${progressPercentage}%`,
                     backgroundColor: statusColor,
                   },
                 ]}
@@ -271,6 +283,26 @@ export default function MyChallengesScreen() {
         <Pressable
           style={[
             styles.filterButton,
+            activeFilter === 'UPCOMING' && styles.activeFilterButton,
+            activeFilter === 'UPCOMING' && {
+              backgroundColor: colors.accent.info,
+            },
+          ]}
+          onPress={() => handleFilterChange('UPCOMING')}
+        >
+          <Text
+            style={[
+              styles.filterText,
+              activeFilter === 'UPCOMING' && styles.activeFilterText,
+            ]}
+          >
+            Upcoming
+          </Text>
+        </Pressable>
+
+        <Pressable
+          style={[
+            styles.filterButton,
             activeFilter === 'COMPLETED' && styles.activeFilterButton,
             activeFilter === 'COMPLETED' && {
               backgroundColor: colors.accent.success,
@@ -318,7 +350,11 @@ export default function MyChallengesScreen() {
         <EmptyState
           icon={<Activity color={colors.gray[400]} size={48} />}
           title={`No ${activeFilter?.toLowerCase() || ''} challenges found`}
-          subtitle="Join challenges from the Challenges tab"
+          subtitle={
+            activeFilter === 'UPCOMING'
+              ? "You don't have any upcoming challenges yet"
+              : 'Join challenges from the Explore tab'
+          }
         />
       ) : (
         <FlatList
