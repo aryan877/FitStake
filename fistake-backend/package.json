@@ -8,7 +8,8 @@
     "start": "node dist/index.js",
     "dev": "nodemon --exec ts-node src/index.ts",
     "test": "jest",
-    "make-admin": "ts-node src/scripts/makeAdmin.ts"
+    "make-admin": "ts-node src/scripts/makeAdmin.ts",
+    "remove-admin": "ts-node src/scripts/removeAdmin.ts"
   },
   "dependencies": {
     "@project-serum/anchor": "^0.26.0",

@@ -70,6 +70,8 @@ EXPO_PUBLIC_PRIVY_CLIENT_ID=your_privy_client_id
 #### Backend (.env)
 
 ```
+PORT=5000
+MONGODB_URI=your_mongodb_connection_string
 PRIVY_APP_ID=your_privy_app_id
 PRIVY_SECRET=your_privy_secret_key
 PRIVY_VERIFICATION_KEY="-----BEGIN PUBLIC KEY-----
@@ -77,7 +79,7 @@ Your Privy verification public key goes here
 -----END PUBLIC KEY-----"
 ```
 
-You can obtain these credentials by signing up at [Privy.io](https://privy.io) and creating a new application.
+You can obtain the Privy credentials by signing up at [Privy.io](https://privy.io) and creating a new application. For MongoDB, you'll need a MongoDB Atlas account or a local MongoDB server.
 
 ### Running the App
 
@@ -114,6 +116,41 @@ The backend handles:
 cd fistake-backend
 npm run dev
 ```
+
+### Admin Management
+
+Administrators in the application have one key privilege:
+
+- Creating public challenges that are accessible to all users
+
+Regular users can only create private challenges that require an invitation code to join, while admin users can create challenges that are visible and joinable by anyone on the platform.
+
+#### Making a User an Admin
+
+To grant admin privileges to a user:
+
+```bash
+cd fistake-backend
+npm run make-admin <username or wallet address>
+```
+
+The script will:
+
+1. Connect to the MongoDB database
+2. Find the user by the provided identifier
+3. Update the user's `isAdmin` field to `true`
+4. Save the changes to the database
+
+#### Removing Admin Privileges
+
+To remove admin status from a user:
+
+```bash
+cd fistake-backend
+npm run remove-admin <username or wallet address>
+```
+
+The script performs similar steps as the makeAdmin script but sets the `isAdmin` field to `false`.
 
 ## ⛓️ Smart Contracts (fitstake-contracts)
 
